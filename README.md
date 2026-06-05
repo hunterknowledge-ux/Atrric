@@ -10,7 +10,7 @@ Atrric utilizes a local **Retrieval-Augmented Generation (RAG)** architecture to
 To maintain maximum control and privacy, the system is completely self-hosted and operates local-first:
 - **Vector Database:** ChromaDB (Local deployment)
 - **Embedding Model:** `mxbai-embed-large` (Open-source, running via Ollama)
-- **Large Language Model (LLM):** `qwen2.5-coder:7b` (Open-source, running via Ollama)
+- **Large Language Model (LLM):** `qwen2.5:1.5b` (Open-source, running via Ollama)
 - **Infrastructure:** GitHub Codespaces (2-core machine, 4GB RAM, 15GB storage)
 
 ## 📁 Core Functionality
