@@ -828,3 +828,187 @@ if args.debug:
     print(f"   First use: {telemetry['first_use']}")
     print(f"   Last use: {telemetry['last_use']}")
     print(f"   Config used: temperature={args.temperature}, top_k={args.top_k}")
+    # ======================================================================
+# TAMBAHAN LANJUTAN 3: QUERY VALIDATION + AUTO-RETRY + SUGGESTIVE + EXPORT
+# ======================================================================
+
+# ======================================================================
+# 1. QUERY VALIDATION — Check soalan kosong / sampah
+# ======================================================================
+def validate_query(query: str) -> tuple[bool, str]:
+    """Validate soalan sebelum proses."""
+    # Check kosong
+    if not query or query.strip() == "":
+        return False, "Soalan kosong. Sila tanya sesuatu."
+    
+    # Check terlalu pendek (kurang dari 3 huruf)
+    if len(query.strip()) < 3:
+        return False, "Soalan terlalu pendek. Sila tanya dengan lebih spesifik."
+    
+    # Check soalan sampah (contoh: "aaa", "123", "???")
+    import re
+    if re.match(r'^[?.\s\d]+$', query.strip()):
+        return False, "Soalan tidak sah. Sila tanya soalan yang bermakna."
+    
+    # Check soalan dalam bahasa asing yang tak dikenali (pilihan)
+    # Jika perlu, tambah logic untuk detect language
+    
+    return True, "OK"
+
+# Jalankan validation
+is_valid, validation_msg = validate_query(args.query)
+if not is_valid:
+    print(f"⚠️ {validation_msg}")
+    logger.warning(f"Invalid query: {args.query}")
+    sys.exit(0)
+
+# ======================================================================
+# 2. AUTO-RETRY — Retry jika Ollama crash
+# ======================================================================
+MAX_RETRIES = 3
+retry_count = 0
+
+def execute_with_retry(func, *args, **kwargs):
+    """Execute function dengan auto-retry."""
+    global retry_count
+    for attempt in range(MAX_RETRIES):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            retry_count += 1
+            wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+            logger.warning(f"Attempt {attempt+1} failed: {e}. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+    raise Exception(f"Failed after {MAX_RETRIES} attempts")
+
+# Wrap streaming dengan retry
+try:
+    stream = execute_with_retry(
+        ollama.chat,
+        model=LLM_MODEL,
+        messages=messages,
+        stream=True,
+        options={
+            "temperature": args.temperature,
+            "top_p": 0.9,
+            "max_tokens": 500
+        }
+    )
+    if retry_count > 0:
+        logger.info(f"Success after {retry_count} retries")
+except Exception as e:
+    print(f"❌ Error: Gagal selepas {MAX_RETRIES} percubaan.\n{e}")
+    logger.error(f"Query failed after retries: {e}")
+    sys.exit(1)
+
+# ======================================================================
+# 3. SUGGESTIVE QUESTIONS — Cadangan soalan seterusnya
+# ======================================================================
+def generate_suggestions(query: str, response: str, context: str) -> list[str]:
+    """Hasilkan 3 soalan cadangan berdasarkan jawapan."""
+    suggestion_prompt = f"""
+    Berdasarkan soalan: "{query}"
+    Dan jawapan: "{response[:500]}..."
+    
+    Berikan 3 soalan susulan yang logik dan mendalam untuk diterokai.
+    Output dalam format:
+    1. [Soalan 1]
+    2. [Soalan 2]
+    3. [Soalan 3]
+    """
+    
+    try:
+        sug_response = ollama.chat(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": suggestion_prompt}],
+            options={"temperature": 0.8, "max_tokens": 150}
+        )
+        suggestions = sug_response['message']['content'].strip().split('\n')
+        # Bersihkan dan format
+        clean_suggestions = []
+        for s in suggestions:
+            if s.strip() and s[0].isdigit() and '.' in s[:3]:
+                clean_suggestions.append(s.strip())
+        return clean_suggestions[:3]
+    except:
+        return []
+
+# Generate suggestions (hanya jika response cukup panjang)
+if len(response_text) > 50:
+    suggestions = generate_suggestions(args.query, response_text, context)
+    if suggestions:
+        print("\n💡 Soalan cadangan:")
+        for s in suggestions:
+            print(f"   {s}")
+        logger.info(f"Suggestions generated: {len(suggestions)}")
+
+# ======================================================================
+# 4. EXPORT TO MARKDOWN — Save jawapan ke file
+# ======================================================================
+def export_to_markdown(query: str, response: str, sources: list, confidence: float):
+    """Export response ke file markdown."""
+    export_dir = Path(__file__).parent / "exports"
+    export_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = export_dir / f"query_{timestamp}.md"
+    
+    content = f"""# Atrric Query Report
+## Soalan
+{query}
+
+## Jawapan
+{response}
+
+## Sumber
+"""
+    for i, source in enumerate(sources):
+        content += f"{i+1}. {source}\n"
+    
+    content += f"\n## Keyakinan Keseluruhan\n{confidence:.2%}\n"
+    content += f"\n## Tarikh\n{datetime.now().isoformat()}\n"
+    
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(content)
+    
+    logger.info(f"Exported to: {filename}")
+    return filename
+
+# Tambah argument untuk export
+parser.add_argument("--export", action="store_true", help="Export jawapan ke markdown")
+args = parser.parse_args()
+
+# Export jika flag --export
+if args.export:
+    sources = [
+        f"{meta.get('source_file', 'unknown')} (confidence: {1 - results['distances'][0][i]:.2%})"
+        for i, meta in enumerate(results['metadatas'][0])
+    ]
+    exported_file = export_to_markdown(
+        args.query,
+        response_text,
+        sources,
+        1 - (sum(results['distances'][0]) / len(results['distances'][0]))
+    )
+    print(f"\n📄 Eksport disimpan: {exported_file}")
+    # ======================================================================
+# SNIPER FIX: OVERRIDE PARSER (PASTE KAT HUJUNG)
+# ======================================================================
+
+# Reset parser dan define semula semua argument
+import argparse
+import sys
+
+# Hapus parser lama (override)
+parser = argparse.ArgumentParser(description="Atrric Query Engine v3.0")
+parser.add_argument("query", type=str, help="Soalan anda")
+parser.add_argument("--top_k", type=int, default=3, help="Bilangan dokumen (default: 3)")
+parser.add_argument("--temperature", type=float, default=0.7, help="Kreativiti (0-1, default: 0.7)")
+parser.add_argument("--debug", action="store_true", help="Tunjukkan proses")
+parser.add_argument("--json", action="store_true", help="Output dalam format JSON")
+parser.add_argument("--export", action="store_true", help="Export jawapan ke markdown")
+
+# Parse arguments (override yang lama)
+args = parser.parse_args()
+
+print(f"🔍 Mencari: '{args.query}' (Top-{args.top_k})...")
