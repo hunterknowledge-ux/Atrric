@@ -495,3 +495,176 @@ print(f"\n📊 Keyakinan keseluruhan: {avg_confidence:.2%}")
 # ======================================================================
 logger.info(f"Avg confidence: {avg_confidence:.2%}")
 logger.info("="*50)
+# ======================================================================
+# TAMBAHAN LANJUTAN: QUERY CACHING + SESSION HISTORY + RATE LIMITING
+# ======================================================================
+
+# ======================================================================
+# 1. QUERY CACHING — Simpan jawapan untuk soalan sama
+# ======================================================================
+import hashlib
+import json
+
+CACHE_DIR = Path(__file__).parent / "cache"
+CACHE_DIR.mkdir(exist_ok=True)
+
+def get_cache_key(query: str, top_k: int, temperature: float) -> str:
+    """Buat key unik untuk cache berdasarkan parameter."""
+    raw = f"{query}|{top_k}|{temperature}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def load_from_cache(key: str) -> dict | None:
+    """Baca cache jika wujud."""
+    cache_file = CACHE_DIR / f"{key}.json"
+    if cache_file.exists():
+        with open(cache_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+def save_to_cache(key: str, data: dict):
+    """Simpan response ke cache."""
+    cache_file = CACHE_DIR / f"{key}.json"
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ======================================================================
+# 2. SESSION HISTORY — Ingat perbualan lepas
+# ======================================================================
+SESSION_HISTORY_FILE = Path(__file__).parent / "session_history.json"
+session_history = []
+
+def load_session_history():
+    """Baca sejarah perbualan dari file."""
+    global session_history
+    if SESSION_HISTORY_FILE.exists():
+        try:
+            with open(SESSION_HISTORY_FILE, "r", encoding="utf-8") as f:
+                session_history = json.load(f)
+        except:
+            session_history = []
+
+def save_session_history():
+    """Simpan sejarah perbualan ke file."""
+    with open(SESSION_HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(session_history, f, ensure_ascii=False, indent=2)
+
+# Muat sejarah perbualan
+load_session_history()
+
+# ======================================================================
+# 3. RATE LIMITING — Elak overload
+# ======================================================================
+from collections import deque
+import time
+
+RATE_LIMIT_WINDOW = 60  # 60 saat
+RATE_LIMIT_MAX = 10     # Maksimum 10 query dalam 60 saat
+
+request_history = deque()
+
+def check_rate_limit():
+    """Check jika melebihi had rate."""
+    current_time = time.time()
+    # Buang request lama
+    while request_history and current_time - request_history[0] > RATE_LIMIT_WINDOW:
+        request_history.popleft()
+    
+    if len(request_history) >= RATE_LIMIT_MAX:
+        wait_time = RATE_LIMIT_WINDOW - (current_time - request_history[0])
+        return False, f"Rate limit exceeded. Please wait {wait_time:.0f} seconds."
+    
+    request_history.append(current_time)
+    return True, "OK"
+
+# ======================================================================
+# 4. INTEGRASI — Cek cache sebelum proses
+# ======================================================================
+cache_key = get_cache_key(args.query, args.top_k, args.temperature)
+cached_response = load_from_cache(cache_key)
+
+if cached_response:
+    print("📦 Menggunakan cache...")
+    print("\n📌 Jawapan:")
+    print(cached_response['response'])
+    print(f"\n🔎 Berdasarkan {cached_response['source_count']} dokumen sumber.")
+    print(f"📊 Keyakinan: {cached_response['avg_confidence']:.2%}")
+    print(f"⏱️  Dijana: {cached_response['timestamp']}")
+    print(f"💾 Cached at: {cached_response['cached_at']}")
+    sys.exit(0)
+
+# ======================================================================
+# 5. INTEGRASI — Rate limit check
+# ======================================================================
+rate_ok, rate_msg = check_rate_limit()
+if not rate_ok:
+    print(f"⚠️ {rate_msg}")
+    logger.warning(f"Rate limit exceeded: {args.query}")
+    sys.exit(1)
+
+# ======================================================================
+# 6. INTEGRASI — Tambah session history ke context
+# ======================================================================
+if session_history:
+    history_context = "\n".join([
+        f"User: {h['query']}\nAssistant: {h['response'][:200]}..."
+        for h in session_history[-3:]  # 3 perbualan terakhir
+    ])
+    context = f"Perbualan sebelumnya:\n{history_context}\n\nData baru:\n{context}"
+    logger.info(f"Session history used: {len(session_history)} conversations")
+
+# ======================================================================
+# 7. MODIFIED STREAMING — Simpan ke cache dan history
+# ======================================================================
+# (Ganti bahagian streaming sedia ada dengan yang ni)
+
+response_text = ""
+token_count = 0
+
+print("\n🧠 Memproses...\n")
+print("📌 Jawapan:")
+
+stream = ollama.chat(
+    model=LLM_MODEL,
+    messages=messages,
+    stream=True,
+    options={
+        "temperature": args.temperature,
+        "top_p": 0.9,
+        "max_tokens": 500
+    }
+)
+
+for chunk in stream:
+    content = chunk['message']['content']
+    print(content, end='', flush=True)
+    response_text += content
+    token_count += 1
+
+print("\n")
+
+# ======================================================================
+# 8. SIMPAN KE CACHE & SESSION HISTORY
+# ======================================================================
+
+# Simpan ke cache
+cache_data = {
+    "query": args.query,
+    "top_k": args.top_k,
+    "temperature": args.temperature,
+    "response": response_text,
+    "source_count": len(results['documents'][0]),
+    "avg_confidence": 1 - (sum(results['distances'][0]) / len(results['distances'][0])),
+    "timestamp": datetime.now().isoformat(),
+    "cached_at": datetime.now().isoformat()
+}
+save_to_cache(cache_key, cache_data)
+logger.info(f"Cached response for: {args.query}")
+
+# Simpan ke session history
+session_history.append({
+    "query": args.query,
+    "response": response_text,
+    "timestamp": datetime.now().isoformat()
+})
+save_session_history()
+logger.info(f"Session history updated: {len(session_history)} conversations")
