@@ -354,3 +354,144 @@ for i, meta in enumerate(results['metadatas'][0]):
 
 avg_confidence = 1 - (sum(results['distances'][0]) / len(results['distances'][0]))
 print(f"\n📊 Keyakinan keseluruhan: {avg_confidence:.2%}")
+# ======================================================================
+# TAMBAHAN: LOGGING SYSTEM
+# ======================================================================
+import logging
+import time
+from datetime import datetime
+from pathlib import Path
+
+LOG_DIR = Path(__file__).parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "query.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+start_time = time.time()
+
+# ======================================================================
+# TAMBAHAN: CHROMA_DB_DIR CHECK
+# ======================================================================
+if not CHROMA_DB_DIR.exists():
+    logger.error(f"❌ ChromaDB directory not found: {CHROMA_DB_DIR}")
+    logger.info("💡 Please run 'python build_rag.py' first to build the index.")
+    sys.exit(1)
+
+# ======================================================================
+# TAMBAHAN: JSON OUTPUT MODE (--json flag)
+# ======================================================================
+parser.add_argument("--json", action="store_true", help="Output dalam format JSON")
+args = parser.parse_args()
+
+# ======================================================================
+# MODIFIED: WRAPPER UNTUK CAPTURE RESPONSE (jika --json)
+# ======================================================================
+response_text = ""
+token_count = 0
+
+# ======================================================================
+# STREAMING OUTPUT (DIUBAH UNTUK CAPTURE)
+# ======================================================================
+print("\n🧠 Memproses...\n")
+print("📌 Jawapan:")
+
+stream = ollama.chat(
+    model=LLM_MODEL,
+    messages=messages,
+    stream=True,
+    options={
+        "temperature": args.temperature,
+        "top_p": 0.9,
+        "max_tokens": 500
+    }
+)
+
+for chunk in stream:
+    content = chunk['message']['content']
+    print(content, end='', flush=True)
+    response_text += content
+    token_count += 1
+
+print("\n")
+
+# ======================================================================
+# PERFORMANCE METRICS
+# ======================================================================
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+logger.info(f"Query: {args.query}")
+logger.info(f"Response length: {len(response_text)} chars, ~{token_count} tokens")
+logger.info(f"Time taken: {elapsed_time:.2f} seconds")
+logger.info(f"Sources: {len(results['documents'][0])} documents")
+
+# ======================================================================
+# ERROR CATEGORIZATION
+# ======================================================================
+def categorize_error(error_msg: str) -> str:
+    if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+        return "CONNECTION_ERROR"
+    elif "model" in error_msg.lower() or "ollama" in error_msg.lower():
+        return "MODEL_ERROR"
+    elif "chroma" in error_msg.lower() or "collection" in error_msg.lower():
+        return "DATABASE_ERROR"
+    else:
+        return "UNKNOWN_ERROR"
+
+# ======================================================================
+# JSON OUTPUT (jika --json)
+# ======================================================================
+if args.json:
+    import json
+    output = {
+        "query": args.query,
+        "top_k": args.top_k,
+        "temperature": args.temperature,
+        "response": response_text,
+        "sources": [
+            {
+                "source": meta.get('source_file', 'unknown'),
+                "confidence": 1 - results['distances'][0][i],
+                "type": meta.get('chunk_type', 'child')
+            }
+            for i, meta in enumerate(results['metadatas'][0])
+        ],
+        "avg_confidence": 1 - (sum(results['distances'][0]) / len(results['distances'][0])),
+        "elapsed_time": round(elapsed_time, 2),
+        "token_estimate": token_count,
+        "timestamp": datetime.now().isoformat()
+    }
+    print("\n" + "="*60)
+    print("📋 JSON OUTPUT:")
+    print(json.dumps(output, indent=2, ensure_ascii=False))
+    print("="*60)
+
+# ======================================================================
+# SOURCE ATTRIBUTION & CONFIDENCE (TAMBAH LOG)
+# ======================================================================
+print(f"\n🔎 Berdasarkan {len(results['documents'][0])} dokumen sumber.")
+
+print("📁 Sumber:")
+for i, meta in enumerate(results['metadatas'][0]):
+    confidence = 1 - results['distances'][0][i]
+    source_name = meta.get('source_file', 'unknown')
+    chunk_type = meta.get('chunk_type', 'child')
+    print(f"   [{i+1}] {source_name} (confidence: {confidence:.2%}, type: {chunk_type})")
+    logger.info(f"Source {i+1}: {source_name}, confidence: {confidence:.2%}")
+
+avg_confidence = 1 - (sum(results['distances'][0]) / len(results['distances'][0]))
+print(f"\n📊 Keyakinan keseluruhan: {avg_confidence:.2%}")
+
+# ======================================================================
+# LOGGING AKHIR
+# ======================================================================
+logger.info(f"Avg confidence: {avg_confidence:.2%}")
+logger.info("="*50)
