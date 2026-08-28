@@ -668,3 +668,163 @@ session_history.append({
 })
 save_session_history()
 logger.info(f"Session history updated: {len(session_history)} conversations")
+# ======================================================================
+# TAMBAHAN LANJUTAN 2: HEALTH CHECK + CONFIG FILE + TELEMETRY
+# ======================================================================
+
+# ======================================================================
+# 1. HEALTH CHECK — Pastikan semua sistem jalan
+# ======================================================================
+def health_check() -> dict:
+    """Check status semua komponen sistem."""
+    status = {
+        "ollama": False,
+        "chromadb": False,
+        "config": False,
+        "data": False,
+        "errors": []
+    }
+    
+    # Check Ollama
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if response.status_code == 200:
+            status["ollama"] = True
+            models = response.json().get("models", [])
+            status["models"] = [m["name"] for m in models]
+        else:
+            status["errors"].append("Ollama API returned error")
+    except Exception as e:
+        status["errors"].append(f"Ollama not running: {e}")
+    
+    # Check ChromaDB
+    try:
+        test_client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
+        test_client.heartbeat()
+        status["chromadb"] = True
+    except Exception as e:
+        status["errors"].append(f"ChromaDB error: {e}")
+    
+    # Check config
+    try:
+        from config import CHROMA_DB_DIR, DATA_DIR
+        status["config"] = True
+        if DATA_DIR.exists():
+            status["data"] = True
+        else:
+            status["errors"].append(f"Data directory not found: {DATA_DIR}")
+    except Exception as e:
+        status["errors"].append(f"Config error: {e}")
+    
+    return status
+
+# ======================================================================
+# 2. CONFIG FILE — Setting dari file (bukan hardcoded)
+# ======================================================================
+CONFIG_FILE = Path(__file__).parent / "query_config.json"
+
+DEFAULT_CONFIG = {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "max_tokens": 500,
+    "top_k": 3,
+    "embed_model": "mxbai-embed-large",
+    "llm_model": "qwen2.5:1.5b"
+}
+
+def load_config() -> dict:
+    """Load config dari file JSON."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return DEFAULT_CONFIG.copy()
+    else:
+        # Buat config file jika takde
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(DEFAULT_CONFIG, f, ensure_ascii=False, indent=2)
+        return DEFAULT_CONFIG.copy()
+
+config = load_config()
+logger.info(f"Config loaded: temperature={config.get('temperature', 0.7)}")
+
+# Override dengan config jika tiada argument
+if not args.temperature and config.get("temperature"):
+    args.temperature = config["temperature"]
+if not args.top_k and config.get("top_k"):
+    args.top_k = config["top_k"]
+
+# ======================================================================
+# 3. TELEMETRY — Track penggunaan sistem
+# ======================================================================
+TELEMETRY_FILE = Path(__file__).parent / "telemetry.json"
+
+def load_telemetry() -> dict:
+    """Load telemetry data."""
+    if TELEMETRY_FILE.exists():
+        try:
+            with open(TELEMETRY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {"total_queries": 0, "queries": [], "first_use": None, "last_use": None}
+    return {"total_queries": 0, "queries": [], "first_use": None, "last_use": None}
+
+def save_telemetry(data: dict):
+    """Save telemetry data."""
+    with open(TELEMETRY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+telemetry = load_telemetry()
+
+# ======================================================================
+# 4. HEALTH CHECK — Jalankan sebelum query
+# ======================================================================
+if args.debug or True:  # Selalu check
+    health = health_check()
+    if health["errors"]:
+        print("⚠️ Health check warnings:")
+        for err in health["errors"]:
+            print(f"   - {err}")
+        logger.warning(f"Health check issues: {health['errors']}")
+    else:
+        logger.info("✅ Health check passed")
+        print("✅ Sistem sedia.")
+
+# ======================================================================
+# 5. INTEGRASI TELEMETRY — Track query
+# ======================================================================
+telemetry["total_queries"] += 1
+telemetry["queries"].append({
+    "query": args.query,
+    "timestamp": datetime.now().isoformat(),
+    "top_k": args.top_k,
+    "temperature": args.temperature,
+    "response_length": len(response_text),
+    "elapsed_time": round(elapsed_time, 2) if 'elapsed_time' in locals() else 0,
+    "avg_confidence": avg_confidence if 'avg_confidence' in locals() else 0,
+    "source_count": len(results['documents'][0]) if results.get('documents') else 0,
+    "cached": cached_response if 'cached_response' in locals() and cached_response else False
+})
+
+# Simpan hanya 100 query terakhir untuk elak file besar
+if len(telemetry["queries"]) > 100:
+    telemetry["queries"] = telemetry["queries"][-100:]
+
+if not telemetry["first_use"]:
+    telemetry["first_use"] = datetime.now().isoformat()
+telemetry["last_use"] = datetime.now().isoformat()
+
+save_telemetry(telemetry)
+logger.info(f"Telemetry updated: {telemetry['total_queries']} total queries")
+
+# ======================================================================
+# 6. TUNJUKKAN TELEMETRY RINGKAS (jika --debug)
+# ======================================================================
+if args.debug:
+    print("\n📊 Telemetry Summary:")
+    print(f"   Total queries: {telemetry['total_queries']}")
+    print(f"   First use: {telemetry['first_use']}")
+    print(f"   Last use: {telemetry['last_use']}")
+    print(f"   Config used: temperature={args.temperature}, top_k={args.top_k}")
