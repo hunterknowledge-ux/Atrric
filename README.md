@@ -1,27 +1,33 @@
 
-# Atrric: Market Intelligence Engine (MVP)
+# Atrric: Agentic & Graph-Powered Market Intelligence Engine
 
-A standalone, local-first market intelligence proof-of-concept (PoC) designed to analyze Malaysian Gen Z behavior and sentiment.
+A native-AI, local-first market intelligence platform engineered to map, correlate, and analyze Malaysian Gen Z behavior, sentiment, and trend propagation at scale.
 
-## 🚀 Overview
-Atrric utilizes a local **Retrieval-Augmented Generation (RAG)** architecture to process unstructured data and allow semantic querying. The entire codebase was built by a non-traditional/outsider founder via highly efficient AI-assisted **vibe coding**, proving extreme execution capability with zero framework overhead.
+## 🚀 Vision & Core Premise
+Atrric operates as an enterprise-grade intelligence engine—combining Multi-Agent Orchestration, Knowledge Graphs, and Vector Retrieval to transform unstructured Big Data into actionable market insights. Built with data sovereignty in mind and zero framework bloat.
 
-## 🛠️ Technical Stack & Architecture
-To maintain maximum control and privacy, the system is completely self-hosted and operates local-first:
-- **Vector Database:** ChromaDB (Local deployment)
-- **Embedding Model:** `mxbai-embed-large` (Open-source, running via Ollama)
-- **Large Language Model (LLM):** `qwen2.5:1.5b` (Open-source, running via Ollama)
-- **Infrastructure:** GitHub Codespaces (2-core machine, 4GB RAM, 15GB storage)
+## 🛠️ Architecture
+- **Agentic Orchestration:** Specialized AI Agents for autonomous ingestion, entity-relation extraction, self-correction, and complex analytical reasoning.
+- **Hybrid GraphRAG Engine:** Blends Knowledge Graphs (for mapping multi-hop relationships between subcultures, slang, and spending behavior) with Vector DB semantic search.
+- **Vector Database:** ChromaDB (Local deployment).
+- **Local LLM Engine:** Ollama integration (`qwen2.5` / scalable to larger reasoning models).
+- **Embedding Model:** `mxbai-embed-large`.
+- **Infrastructure:** GitHub Codespaces (2-core machine, 4GB RAM).
 
-## 📁 Core Functionality
-- `build_rag.py`: Ingests raw `.txt` files, chunks text segments, generates vector embeddings, and stores them securely in the local ChromaDB.
-- `query_rag.py`: Accepts user queries, performs vector semantic search to retrieve context, and feeds it into the local LLM for context-aware generation.
+## 📌 Core Capabilities
+- **Autonomous Data Pipeline:** Agents process raw social media data, survey transcripts, and code-switching text (Manglish/Malay/English).
+- **Multi-Hop Trend Analysis:** Uncovers non-obvious connections between cultural catalysts and financial habits.
+- **Local-First Processing:** Fully self-hosted architecture ensuring absolute data privacy and zero API overhead.
 
-## 📈 Current Stage & Strategic Edge
-- **Status:** Fully functional MVP tested with sample data pipelines.
-- **Privacy by Design:** 100% local processing ensures absolute data sovereignty.
-- **Zero Infra Cost:** Built entirely using free-tier services and open-source models, demonstrating capital efficiency.
-- **Minimalist Codebase:** Under 200 lines of Python code for the core engine, allowing fast maintenance and iterations.
+## ⚡ Quickstart
+```bash
+# Clone repository
+git clone [https://github.com/hunterknowledge-ux/Atrric.git](https://github.com/hunterknowledge-ux/Atrric.git)
+cd Atrric
 
-## 🎯 Next Steps
-Transitioning into live-data ingestion testing and market validation to refine extraction accuracy and test core hypotheses.
+# Install dependencies
+pip install -r requirements.txt
+
+# Execute Pipeline
+python build_rag.py
+python query_rag.py
