@@ -1,0 +1,27 @@
+# Makefile - Shortcut commands untuk Atrric
+
+.PHONY: build query api test eval clean
+
+build:
+	python build_rag.py
+
+query:
+	python query_rag.py "$(q)"
+
+api:
+	python api.py
+
+test:
+	pytest -v
+
+eval:
+	python evaluate_rag.py
+
+clean:
+	rm -rf chroma_db/ cache/ logs/*.log
+	rm -rf __pycache__ */__pycache__
+
+install:
+	pip install -r requirements.txt
+
+all: install build test
