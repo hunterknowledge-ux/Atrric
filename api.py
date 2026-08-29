@@ -1,11 +1,12 @@
 """
-api.py - Atrric Web API
+api.py - Atrric Web API (Dengan Monitoring)
 =====================================================================
 Fungsi: Jadikan Atrric sebagai web service.
 Endpoints:
 - GET /query?q=soalan&top_k=3&temperature=0.7
 - GET /health
 - GET /stats
+- GET /metrics  # 🔥 BARU: Tunjuk precision/recall
 - POST /query (JSON body)
 
 Cara guna:
@@ -18,9 +19,10 @@ Cara guna:
 import sys
 import json
 import time
+import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import JSONResponse
@@ -37,6 +39,20 @@ from config import CHROMA_DB_DIR
 COLLECTION_NAME = "atrric_corpus"
 EMBED_MODEL = "mxbai-embed-large"
 LLM_MODEL = "qwen2.5:1.5b"
+
+# Setup logging
+LOG_DIR = Path(__file__).parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "api.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # ======================================================================
 # SYSTEM PROMPT (Ringkas untuk API)
@@ -75,11 +91,23 @@ class QueryResponse(BaseModel):
     timestamp: str
 
 # ======================================================================
-# GLOBAL CLIENT
+# GLOBAL CLIENT & METRICS
 # ======================================================================
 client = None
 collection = None
-telemetry = {"total_queries": 0, "queries": []}
+
+telemetry = {
+    "total_queries": 0,
+    "queries": [],
+    "metrics": {
+        "avg_precision": 0.0,
+        "avg_recall": 0.0,
+        "total_sources_retrieved": 0,
+        "total_relevant_sources": 0,
+        "precision_history": [],
+        "recall_history": []
+    }
+}
 
 def init_chromadb():
     """Initialise ChromaDB connection."""
@@ -89,8 +117,63 @@ def init_chromadb():
         collection = client.get_collection(name=COLLECTION_NAME)
         return True
     except Exception as e:
-        print(f"❌ ChromaDB Error: {e}")
+        logger.error(f"ChromaDB Error: {e}")
         return False
+
+# ======================================================================
+# METRICS FUNCTIONS
+# ======================================================================
+def calculate_precision_at_k(retrieved_sources: List[Dict], top_k: int) -> float:
+    """
+    Kira Precision@K: Berapa banyak sumber yang relevan daripada K yang diambil.
+    Anggaran: sumber dengan confidence > 0.5 dianggap relevan.
+    """
+    if not retrieved_sources or top_k == 0:
+        return 0.0
+    
+    relevant = sum(1 for s in retrieved_sources[:top_k] if s.get('confidence', 0) > 0.5)
+    return relevant / min(top_k, len(retrieved_sources)) if retrieved_sources else 0.0
+
+def calculate_recall_at_k(retrieved_sources: List[Dict], top_k: int, total_available: int = None) -> float:
+    """
+    Kira Recall@K: Berapa banyak sumber relevan yang berjaya diambil dari jumlah keseluruhan.
+    Anggaran: guna total chunks dalam collection sebagai proxy.
+    """
+    if not retrieved_sources or top_k == 0:
+        return 0.0
+    
+    relevant_retrieved = sum(1 for s in retrieved_sources[:top_k] if s.get('confidence', 0) > 0.5)
+    
+    # Jika total_available takde, guna top_k sebagai anggaran
+    if total_available is None:
+        total_available = max(top_k, len(retrieved_sources))
+    
+    return relevant_retrieved / total_available if total_available > 0 else 0.0
+
+def update_metrics(sources: List[Dict], top_k: int):
+    """Update telemetry metrics."""
+    m = telemetry["metrics"]
+    
+    precision = calculate_precision_at_k(sources, top_k)
+    recall = calculate_recall_at_k(sources, top_k)
+    
+    m["precision_history"].append(precision)
+    m["recall_history"].append(recall)
+    
+    # Keep only last 100 records
+    if len(m["precision_history"]) > 100:
+        m["precision_history"] = m["precision_history"][-100:]
+    if len(m["recall_history"]) > 100:
+        m["recall_history"] = m["recall_history"][-100:]
+    
+    # Update averages
+    m["avg_precision"] = sum(m["precision_history"]) / len(m["precision_history"]) if m["precision_history"] else 0
+    m["avg_recall"] = sum(m["recall_history"]) / len(m["recall_history"]) if m["recall_history"] else 0
+    
+    m["total_sources_retrieved"] += len(sources)
+    m["total_relevant_sources"] += sum(1 for s in sources if s.get('confidence', 0) > 0.5)
+    
+    logger.info(f"📊 Precision: {precision:.2%} | Recall: {recall:.2%} | Avg P: {m['avg_precision']:.2%} | Avg R: {m['avg_recall']:.2%}")
 
 # ======================================================================
 # CORE FUNCTION
@@ -158,12 +241,17 @@ def run_query(query: str, top_k: int = 3, temperature: float = 0.7) -> dict:
             "type": meta.get('chunk_type', 'child')
         })
     
+    # Update metrics
+    update_metrics(sources, top_k)
+    
     # Update telemetry
     telemetry["total_queries"] += 1
     telemetry["queries"].append({
         "query": query,
         "timestamp": datetime.now().isoformat(),
-        "source_count": len(sources)
+        "source_count": len(sources),
+        "precision": calculate_precision_at_k(sources, top_k),
+        "recall": calculate_recall_at_k(sources, top_k)
     })
     if len(telemetry["queries"]) > 100:
         telemetry["queries"] = telemetry["queries"][-100:]
@@ -172,7 +260,9 @@ def run_query(query: str, top_k: int = 3, temperature: float = 0.7) -> dict:
         "response": response['message']['content'],
         "sources": sources,
         "confidence": avg_confidence,
-        "elapsed_time": time.time() - start_time
+        "elapsed_time": time.time() - start_time,
+        "precision": calculate_precision_at_k(sources, top_k),
+        "recall": calculate_recall_at_k(sources, top_k)
     }
 
 # ======================================================================
@@ -187,7 +277,9 @@ async def root():
         "endpoints": [
             "/query?q=...&top_k=3&temperature=0.7",
             "/health",
-            "/stats"
+            "/stats",
+            "/metrics",  # 🔥 BARU
+            "/docs"
         ],
         "docs": "/docs"
     }
@@ -231,6 +323,20 @@ async def stats():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/metrics")
+async def metrics():
+    """🔥 Tunjukkan precision/recall metrics."""
+    m = telemetry["metrics"]
+    return {
+        "avg_precision": m["avg_precision"],
+        "avg_recall": m["avg_recall"],
+        "total_sources_retrieved": m["total_sources_retrieved"],
+        "total_relevant_sources": m["total_relevant_sources"],
+        "precision_history": m["precision_history"][-20:],
+        "recall_history": m["recall_history"][-20:],
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/query")
 async def query_get(
     q: str = Query(..., description="Soalan anda"),
@@ -255,6 +361,8 @@ async def query_get(
         "response": result["response"],
         "sources": result["sources"],
         "confidence": result["confidence"],
+        "precision": result.get("precision", 0.0),  # 🔥 BARU
+        "recall": result.get("recall", 0.0),       # 🔥 BARU
         "elapsed_time": result["elapsed_time"],
         "timestamp": datetime.now().isoformat()
     }
@@ -279,6 +387,8 @@ async def query_post(request: QueryRequest):
         "response": result["response"],
         "sources": result["sources"],
         "confidence": result["confidence"],
+        "precision": result.get("precision", 0.0),  # 🔥 BARU
+        "recall": result.get("recall", 0.0),       # 🔥 BARU
         "elapsed_time": result["elapsed_time"],
         "timestamp": datetime.now().isoformat()
     }
@@ -290,7 +400,7 @@ if __name__ == "__main__":
     import uvicorn
     
     print("=" * 60)
-    print("🚀 ATRRIC WEB API")
+    print("🚀 ATRRIC WEB API v1.0 (Dengan Monitoring)")
     print("=" * 60)
     
     # Init ChromaDB
@@ -301,6 +411,7 @@ if __name__ == "__main__":
     
     print("🌐 Server starting at http://localhost:8000")
     print("📚 API docs: http://localhost:8000/docs")
+    print("📊 Metrics: http://localhost:8000/metrics")
     print("=" * 60)
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
