@@ -1,0 +1,44 @@
+# docker-compose.yml - Multi-container setup
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: atrric-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    command: serve
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: atrric-chromadb
+    ports:
+      - "8001:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    volumes:
+      - chroma_data:/chroma/chroma
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: atrric-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+      - chromadb
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
