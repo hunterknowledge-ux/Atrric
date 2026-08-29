@@ -1,5 +1,5 @@
 """
-build_rag.py - Atrric Industrial RAG Builder v2.0
+build_rag.py - Atrric Industrial RAG Builder v2.0 (Memory Optimized)
 ==================================================
 Fitur Power:
 - Semantic Chunking (NLTK) + Parent-Child Chunking
@@ -10,6 +10,7 @@ Fitur Power:
 - Error Handling Robust (skip chunk rosak)
 - Config-Driven (semua setting dari config.py)
 - Hybrid Retrieval Preparation (metadata untuk BM25 nanti)
+- Memory Optimization: Batch processing + Garbage Collection
 """
 
 import os
@@ -17,6 +18,7 @@ import sys
 import json
 import hashlib
 import logging
+import gc  # 🔥 TAMBAHAN: Garbage Collection
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -34,6 +36,7 @@ EMBED_MODEL = "mxbai-embed-large"
 CHUNK_SIZE = 500          # Saiz chunk (characters)
 CHUNK_OVERLAP = 50        # Overlap antara chunk
 PARENT_CHUNK_SIZE = 1000  # Untuk Parent-Child (konteks penuh)
+BATCH_SIZE = 10           # 🔥 TAMBAHAN: Saiz batch untuk embedding
 
 # Setup logging
 LOG_DIR = Path(__file__).parent / "logs"
@@ -142,19 +145,72 @@ def generate_metadata(
         "chunk_size": CHUNK_SIZE if chunk_type == "child" else PARENT_CHUNK_SIZE
     }
 
+# ========== BATCH EMBEDDING HELPER ==========
+def embed_and_store_batch(collection, file_path, chunks, chunk_type, parent_chunks):
+    """
+    Process satu batch chunks: embed dan store ke ChromaDB.
+    """
+    batch_metadata = []
+    batch_embeddings = []
+    batch_ids = []
+    batch_docs = []
+    
+    for idx, chunk in enumerate(chunks):
+        if not chunk.strip():
+            continue
+        try:
+            embed = ollama.embeddings(model=EMBED_MODEL, prompt=chunk)["embedding"]
+            
+            # Parent index: cari parent yang mengandungi child ni (hanya untuk child)
+            parent_idx = None
+            if chunk_type == "child":
+                for p_idx, parent in enumerate(parent_chunks):
+                    if chunk in parent:
+                        parent_idx = p_idx
+                        break
+            
+            meta = generate_metadata(
+                file_path, chunk, idx,
+                chunk_type=chunk_type,
+                parent_index=parent_idx if chunk_type == "child" else idx
+            )
+            
+            batch_ids.append(f"{file_path.stem}_{chunk_type}_{idx}_{meta['chunk_hash']}")
+            batch_embeddings.append(embed)
+            batch_docs.append(chunk)
+            batch_metadata.append(meta)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to embed {chunk_type} chunk {idx} in {file_path.name}: {e}")
+            continue
+    
+    # Add batch ke ChromaDB
+    if batch_ids:
+        try:
+            collection.add(
+                ids=batch_ids,
+                embeddings=batch_embeddings,
+                documents=batch_docs,
+                metadatas=batch_metadata
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to add batch to ChromaDB: {e}")
+    
+    return len(batch_ids)
+
 # ========== MAIN BUILD FUNCTION ==========
 def build_index():
     """
     Proses utama: baca semua .txt, chunk, embed, simpan dalam ChromaDB.
     """
     logger.info("=" * 60)
-    logger.info("🚀 ATRRIC INDUSTRIAL RAG BUILDER v2.0")
+    logger.info("🚀 ATRRIC INDUSTRIAL RAG BUILDER v2.0 (Memory Optimized)")
     logger.info("=" * 60)
     logger.info(f"📁 Data directory: {DATA_DIR}")
     logger.info(f"🗄️  Collection: {COLLECTION_NAME}")
     logger.info(f"🧠 Embedding model: {EMBED_MODEL}")
     logger.info(f"📏 Chunk size: {CHUNK_SIZE} chars (overlap: {CHUNK_OVERLAP})")
     logger.info(f"📏 Parent chunk size: {PARENT_CHUNK_SIZE} chars")
+    logger.info(f"🔢 Batch size: {BATCH_SIZE} chunks per batch")
     logger.info("=" * 60)
     
     # 1. Get all text files
@@ -200,64 +256,21 @@ def build_index():
             logger.info(f"   ↳ Child chunks: {len(child_chunks)}")
             logger.info(f"   ↳ Parent chunks: {len(parent_chunks)}")
             
-            # Store child chunks with their parent reference
-            for idx, chunk in enumerate(child_chunks):
-                if not chunk.strip():
-                    continue
-                    
-                try:
-                    embed = ollama.embeddings(model=EMBED_MODEL, prompt=chunk)["embedding"]
-                    
-                    # Parent index: cari parent yang mengandungi child ni
-                    parent_idx = None
-                    for p_idx, parent in enumerate(parent_chunks):
-                        if chunk in parent:
-                            parent_idx = p_idx
-                            break
-                    
-                    meta = generate_metadata(
-                        file_path, chunk, idx,
-                        chunk_type="child",
-                        parent_index=parent_idx
-                    )
-                    
-                    collection.add(
-                        ids=[f"{file_path.stem}_child_{idx}_{meta['chunk_hash']}"],
-                        embeddings=[embed],
-                        documents=[chunk],
-                        metadatas=[meta]
-                    )
-                    total_child_chunks += 1
-                    
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to embed child chunk {idx} in {file_path.name}: {e}")
-                    continue
+            # --- Process child chunks in batches ---
+            for i in range(0, len(child_chunks), BATCH_SIZE):
+                batch = child_chunks[i:i+BATCH_SIZE]
+                logger.info(f"      🔄 Child batch {i//BATCH_SIZE + 1}/{(len(child_chunks)-1)//BATCH_SIZE + 1}")
+                count = embed_and_store_batch(collection, file_path, batch, "child", parent_chunks)
+                total_child_chunks += count
+                gc.collect()  # Force memory cleanup after batch
             
-            # Store parent chunks
-            for idx, chunk in enumerate(parent_chunks):
-                if not chunk.strip():
-                    continue
-                    
-                try:
-                    embed = ollama.embeddings(model=EMBED_MODEL, prompt=chunk)["embedding"]
-                    
-                    meta = generate_metadata(
-                        file_path, chunk, idx,
-                        chunk_type="parent",
-                        parent_index=idx
-                    )
-                    
-                    collection.add(
-                        ids=[f"{file_path.stem}_parent_{idx}_{meta['chunk_hash']}"],
-                        embeddings=[embed],
-                        documents=[chunk],
-                        metadatas=[meta]
-                    )
-                    total_parent_chunks += 1
-                    
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to embed parent chunk {idx} in {file_path.name}: {e}")
-                    continue
+            # --- Process parent chunks in batches ---
+            for i in range(0, len(parent_chunks), BATCH_SIZE):
+                batch = parent_chunks[i:i+BATCH_SIZE]
+                logger.info(f"      🔄 Parent batch {i//BATCH_SIZE + 1}/{(len(parent_chunks)-1)//BATCH_SIZE + 1}")
+                count = embed_and_store_batch(collection, file_path, batch, "parent", parent_chunks)
+                total_parent_chunks += count
+                gc.collect()  # Force memory cleanup after batch
             
             total_files_processed += 1
             
