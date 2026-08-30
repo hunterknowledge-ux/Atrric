@@ -117,7 +117,7 @@ def init_chromadb():
         collection = client.get_collection(name=COLLECTION_NAME)
         return True
     except Exception as e:
-        logger.error(f"ChromaDB Error: {e}")
+        logger.exception("ChromaDB Error")
         return False
 
 # ======================================================================
@@ -344,6 +344,7 @@ async def query_get(
     temperature: float = Query(0.7, ge=0.0, le=2.0, description="Kreativiti")
 ):
     """Query endpoint (GET)."""
+    validate_input(q)
     if not collection:
         if not init_chromadb():
             raise HTTPException(status_code=503, detail="ChromaDB not available")
@@ -370,6 +371,7 @@ async def query_get(
 @app.post("/query")
 async def query_post(request: QueryRequest):
     """Query endpoint (POST)."""
+    validate_input(request.query)
     if not collection:
         if not init_chromadb():
             raise HTTPException(status_code=503, detail="ChromaDB not available")
@@ -392,7 +394,142 @@ async def query_post(request: QueryRequest):
         "elapsed_time": result["elapsed_time"],
         "timestamp": datetime.now().isoformat()
     }
+# ======================================================================
+# GUARDRAIL LENGKAP - 8 LAPIS
+# ======================================================================
 
+import re
+from typing import Tuple, Optional
+
+# ======================================================================
+# KONFIGURASI GUARDRAIL
+# ======================================================================
+
+ALLOWED_TOPICS = [
+    "gen z", "remaja", "anak muda", "pelajar", "mahasiswa",
+    "ekonomi", "harga", "gaji", "kerjaya", "kewangan",
+    "teknologi", "ai", "internet", "gadget", "digital",
+    "pendidikan", "sekolah", "universiti", "belajar",
+    "sosial", "politik", "masyarakat", "malaysia",
+    "rohingya", "perkauman", "budaya", "agama"
+]
+
+ALLOWED_LANGUAGES = ['ms', 'en', 'zh-cn', 'zh-tw']
+
+FORBIDDEN_PATTERNS = [
+    r"ignore previous instructions",
+    r"system prompt",
+    r"bypass",
+    r"jangan ikut arahan",
+    r"abaikan arahan",
+    r"override",
+    r"forget previous",
+]
+
+PII_PATTERNS = {
+    "ic": r'\b\d{6}-\d{2}-\d{4}\b',
+    "phone": r'\b(?:01|03|04|05|06|07|09)\d{1,2}-\d{7,8}\b',
+    "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+    "credit_card": r'\b(?:\d{4}[-\s]?){3}\d{4}\b'
+}
+
+TOXIC_WORDS = [
+    # Isi sendiri ikut keperluan
+]
+
+# ======================================================================
+# GUARDRAIL FUNCTIONS
+# ======================================================================
+
+def detect_language(text: str) -> str:
+    """Detect language of input."""
+    try:
+        from langdetect import detect
+        lang = detect(text)
+        return lang
+    except:
+        return 'en'  # default if detection fails
+
+def check_input_safety(user_input: str) -> Tuple[bool, Optional[str]]:
+    """
+    Guardrail 8-lapis.
+    
+    Returns:
+        (is_safe, error_message)
+    """
+    
+    # ==================================================================
+    # LAPIS 1: Prompt Injection
+    # ==================================================================
+    for pattern in FORBIDDEN_PATTERNS:
+        if re.search(pattern, user_input, re.IGNORECASE):
+            return False, "Input tidak dibenarkan. Mengandungi arahan system override."
+    
+    # ==================================================================
+    # LAPIS 2: Length Validation
+    # ==================================================================
+    if len(user_input.strip()) < 3:
+        return False, "Soalan terlalu pendek. Minimum 3 aksara."
+    if len(user_input) > 1000:
+        return False, "Soalan terlalu panjang. Maksimum 1000 aksara."
+    
+    # ==================================================================
+    # LAPIS 3: Topic Relevance
+    # ==================================================================
+    if not any(topic in user_input.lower() for topic in ALLOWED_TOPICS):
+        return False, "Soalan di luar skop Atrric. Saya fokus kepada isu Gen Z Malaysia, ekonomi, teknologi, dan pendidikan."
+    
+    # ==================================================================
+    # LAPIS 4: Language Detection
+    # ==================================================================
+    try:
+        lang = detect_language(user_input)
+        if lang not in ALLOWED_LANGUAGES:
+            return False, f"Sila tanya dalam Bahasa Melayu, Inggeris, atau Mandarin. (Detected: {lang})"
+    except:
+        pass  # If detection fails, allow anyway
+    
+    # ==================================================================
+    # LAPIS 5: PII Detection
+    # ==================================================================
+    for pii_type, pattern in PII_PATTERNS.items():
+        if re.search(pattern, user_input):
+            return False, f"Sila jangan kongsi maklumat peribadi ({pii_type}). Ini untuk melindungi privasi anda."
+    
+    # ==================================================================
+    # LAPIS 6: Toxic Content
+    # ==================================================================
+    if any(word in user_input.lower() for word in TOXIC_WORDS):
+        return False, "Kandungan tidak sesuai. Sila tanya dengan cara yang lebih profesional."
+    
+    # ==================================================================
+    # LAPIS 7: Intent Classification (Optional)
+    # ==================================================================
+    # Can be expanded to classify query type
+    
+    # ==================================================================
+    # LAPIS 8: All Passed
+    # ==================================================================
+    return True, None
+
+# ======================================================================
+# WRAPPER FOR API
+# ======================================================================
+
+def validate_input(user_input: str):
+    """Wrapper for API endpoints."""
+    is_safe, error_msg = check_input_safety(user_input)
+    if not is_safe:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Input tidak dapat diproses.",
+                "reason": error_msg,
+                "suggestion": "Cuba tanya soalan yang berkaitan dengan Gen Z Malaysia, ekonomi, teknologi, atau pendidikan.",
+                "example": "Contoh: 'Apa pandangan Gen Z tentang harga barang sekarang?'"
+            }
+        )
+    return True
 # ======================================================================
 # MAIN
 # ======================================================================
