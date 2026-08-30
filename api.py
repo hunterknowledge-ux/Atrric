@@ -116,7 +116,7 @@ def init_chromadb():
         client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
         collection = client.get_collection(name=COLLECTION_NAME)
         return True
-    except Exception as e:
+    except Exception :
         logger.exception("ChromaDB Error")
         return False
 
