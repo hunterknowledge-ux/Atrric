@@ -38,7 +38,7 @@ from config import CHROMA_DB_DIR
 
 COLLECTION_NAME = "atrric_corpus"
 EMBED_MODEL = "mxbai-embed-large"
-LLM_MODEL = "qwen2.5:1.5b"
+LLM_MODEL = "granite4.2:8b"
 
 # Setup logging
 LOG_DIR = Path(__file__).parent / "logs"
