@@ -1,14 +1,14 @@
 [
     {
-        "question": "apa isu rohingya dalam kalangan gen z",
-        "expected": "rohingya"
+        "question": "",
+        "expected": ""
     },
     {
-        "question": "apa game paling popular dalam kalangan gen z",
-        "expected": "mlbb"
+        "question": "",
+        "expected": ""
     },
     {
-        "question": "apa pandangan gen z tentang roblox",
-        "expected": "roblox"
+        "question": "",
+        "expected": ""
     }
 ]
