@@ -201,3 +201,4 @@ Phase 8	Advanced RAG (Hybrid Search, Reranking)	⏳ Planned
 This is an experimental project — feedback, ideas, and contributions are welcome.
 
 "Building Sovereign RAG for Gen Z Malaysia — one step at a time."
+# ready to edit on termux
