@@ -1,4 +1,4 @@
-# 🧠 Atrric: Sovereign RAG for Gen Z Malaysia
+# Atrric: Sovereign RAG for Gen Z Malaysia
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.95-green)](https://fastapi.tiangolo.com/)
@@ -9,7 +9,7 @@
 
 ---
 
-## 📖 Table of Contents
+##  Table of Contents
 - [Overview](#overview)
 - [Why Atrric?](#why-atrric)
 - [Current Status](#current-status)
@@ -23,7 +23,7 @@
 
 ---
 
-## 🔍 Overview
+##  Overview
 
 **Atrric** is a localized Retrieval-Augmented Generation (RAG) infrastructure designed to analyze and understand Gen Z behavior in Malaysia. Built for data sovereignty, offline-first operation, and enterprise readiness.
 
@@ -33,11 +33,11 @@
 - Secure API with 8-layer guardrails for input safety
 - Agentic capabilities for code assistance and automation
 
-**🎯 Target Audience:** Enterprises, technology companies, and investors seeking ground-truth intelligence on Gen Z Malaysia — particularly Chinese tech companies entering the Malaysian market and local enterprises needing AI-driven consumer insights.
+** Target Audience:** Enterprises, technology companies, and investors seeking ground-truth intelligence on Gen Z Malaysia — particularly Chinese tech companies entering the Malaysian market and local enterprises needing AI-driven consumer insights.
 
 ---
 
-## 🎯 Why Atrric?
+## Why Atrric?
 
 ### The Problem
 
@@ -92,7 +92,7 @@ Atrric extracts intelligence from real conversations — not surveys — through
 
 ---
 
-## 🚀 Quickstart
+##  Quickstart
 
 ### Prerequisites
 - Python 3.10+
@@ -141,7 +141,7 @@ LLM Generation (Ollama — qwen2.5 / granite4.2)
     ↓
 Response + Sources + Confidence
 
-⚡ Features
+Features
 Feature	Description
 RAG Pipeline	Semantic chunking, parent-child chunking, ChromaDB vector search with rich metadata
 Offline LLM	Integrated with Ollama — supports qwen2.5:1.5b, granite4.2:8b, and more
@@ -171,7 +171,7 @@ Component Flow
 
 5.Generation Layer — LLM generates final response with source attribution and confidence scoring
 
-🛠️ Tech Stack
+Tech Stack
 Component	Technology	Version
 Vector Database	ChromaDB	0.5+
 LLM	Ollama (qwen2.5, granite4.2)	0.5+
@@ -186,7 +186,7 @@ NLP	NLTK, langdetect	—
 Logging	Python logging module	—
 Version Control	Git, GitHub	—
 
-🗺️ Roadmap
+Roadmap
 Phase	Target	Status
 Phase 1	POC — RAG pipeline + API	✅ Done
 Phase 2	Evaluation framework + Security	✅ Done
