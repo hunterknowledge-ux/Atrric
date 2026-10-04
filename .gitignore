@@ -218,3 +218,26 @@ __marimo__/
 .streamlit/secrets.toml
 chroma_db/
 .env
+
+# Atrric runtime outputs
+logs/
+cache/
+exports/
+session_history.json
+telemetry.json
+query_config.json
+data/pipeline_report.json
+
+# Temp files
+_imports.txt
+_imports_temp.txt
+_pip_freeze_temp.txt
+
+# Model files
+*.gguf
+*.bin
+*.safetensors
+
+# OS
+.DS_Store
+Thumbs.db
