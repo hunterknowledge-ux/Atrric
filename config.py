@@ -7,7 +7,6 @@ CHROMA_DB_DIR = ROOT_DIR / "chroma_db"
 UJIAN_TXT_PATH = DATA_DIR / "ujian.txt"
 
 
-
 # ======================================================================
 # PHONE MODE (llama.cpp + local models)
 # ======================================================================
