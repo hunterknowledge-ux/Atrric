@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 
 # Expected embedding dimension (hourai2-50m = 384)
-EXPECTED_DIM = 384
+EXPECTED_DIM = 128
 
 
 class EmbedError(Exception):
