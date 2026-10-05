@@ -61,7 +61,7 @@ def generate(
         "-n", str(n),
         "-t", str(config.THREADS),
         "-c", str(config.CONTEXT_SIZE),
-        "--simple-io",
+        
     ]
 
     try:
