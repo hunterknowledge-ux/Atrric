@@ -1,15 +1,15 @@
 """
 core/llm.py - LLM wrapper using llama-cli.
 
-Calls llama-cli in non-conversation mode, sends a prompt,
-and returns the generated text (cleaned).
+Runs llama-cli, feeds the prompt, sends /exit via stdin to close
+the interactive session, and returns the cleaned generated text.
 """
 
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -22,20 +22,14 @@ class LLMError(Exception):
     pass
 
 
-# Flags that disable interactive chat mode. Different llama.cpp
-# builds name this differently, so we try both and use whichever works.
-_NON_CONVERSATION_FLAGS = ("-no-cnv", "--no-conversation")
-
-# Markers where the generated text ends.
+# Where the generated text ends.
 _STOP_MARKERS = (
     "\n[ Prompt:",
     "\n[ Generation:",
     "\nExiting",
     "\n\n> ",
+    "\n> /exit",
 )
-
-# Answer prefixes. Last occurrence wins (model may echo prompt first).
-_ANSWER_MARKERS = ("Jawapan:", "Answer:")
 
 
 def generate(
@@ -52,7 +46,7 @@ def generate(
         timeout: Max seconds to wait.
 
     Returns:
-        Cleaned generated text (without prompt echo or stats).
+        Cleaned generated text.
 
     Raises:
         ValueError: If prompt is empty.
@@ -63,7 +57,7 @@ def generate(
 
     n = max_tokens if max_tokens is not None else config.MAX_TOKENS
 
-    base_cmd = [
+    cmd = [
         str(config.LLAMA_CLI),
         "-m", str(config.SMOLLM_MODEL),
         "-p", prompt,
@@ -72,87 +66,58 @@ def generate(
         "-c", str(config.CONTEXT_SIZE),
     ]
 
-    stdout, stderr = _run_with_flag_fallback(base_cmd, timeout)
+    try:
+        result = subprocess.run(
+            cmd,
+            input="/exit\n",
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise LLMError(f"Generation timed out after {timeout}s")
+    except FileNotFoundError:
+        raise LLMError(f"Binary not found: {config.LLAMA_CLI}")
 
-    if stdout is None:
+    if result.returncode != 0:
         raise LLMError(
-            f"llama-cli failed with all flag variants. "
-            f"Last stderr: {stderr[-300:] if stderr else 'none'}"
+            f"llama-cli exited with code {result.returncode}\n"
+            f"STDERR: {result.stderr[-300:]}"
         )
 
-    text = _clean_output(stdout, prompt)
+    text = _clean_output(result.stdout, prompt)
 
     if not text:
         raise LLMError(
             f"No generated text found.\n"
-            f"STDOUT tail: {stdout[-400:]}"
+            f"STDOUT tail: {result.stdout[-400:]}"
         )
 
     return text
 
 
-def _run_with_flag_fallback(
-    base_cmd: List[str],
-    timeout: int,
-) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Try each non-conversation flag until one works.
-
-    Returns (stdout, stderr). stdout is None if every attempt failed.
-    """
-    last_stderr: Optional[str] = None
-
-    for flag in _NON_CONVERSATION_FLAGS:
-        cmd = base_cmd + [flag]
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
-            raise LLMError(f"Generation timed out after {timeout}s")
-        except FileNotFoundError:
-            raise LLMError(f"Binary not found: {config.LLAMA_CLI}")
-
-        if result.returncode != 0 and "unknown" in result.stderr.lower():
-            last_stderr = result.stderr
-            continue
-
-        if result.returncode != 0:
-            raise LLMError(
-                f"llama-cli exited with code {result.returncode}\n"
-                f"STDERR: {result.stderr[-300:]}"
-            )
-
-        return result.stdout, result.stderr
-
-    return None, last_stderr
-
-
 def _clean_output(raw: str, prompt: str) -> str:
     """
-    Extract generated text from llama-cli output.
+    Extract generated text from llama-cli stdout.
 
-    llama-cli may echo the prompt, print timing stats, and
-    leave interactive-mode artifacts. We isolate the answer.
+    The output contains: banner, echoed prompt, generated text,
+    timing stats, exit message. We isolate only the generated part.
     """
-    # Strip ANSI escape codes
+    # Strip ANSI colors
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
 
-    # Remove interactive prompt prefixes at line starts
+    # Strip leading interactive prompts at line starts
     raw = re.sub(r"^> ", "", raw, flags=re.MULTILINE)
 
-    # Find the LAST answer marker (model sometimes echoes prompt)
+    # Find last "Jawapan:" / "Answer:" marker to skip prompt echo
     tail = raw
-    for marker in _ANSWER_MARKERS:
+    for marker in ("Jawapan:", "Answer:"):
         idx = raw.rfind(marker)
         if idx != -1:
             tail = raw[idx + len(marker):]
             break
 
-    # Cut at stats / exit / next prompt
+    # Cut at any stop marker
     for stop in _STOP_MARKERS:
         idx = tail.find(stop)
         if idx != -1:
