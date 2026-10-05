@@ -119,7 +119,7 @@ def search(
 
 if __name__ == "__main__":
     # Self-test: create store with dummy vectors
-    test_path = Path("/tmp/test_store.json")
+    test_path = Path(__file__).parent / "test_store.json"
     if test_path.exists():
         test_path.unlink()
 
