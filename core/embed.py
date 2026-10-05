@@ -86,23 +86,31 @@ def embed(text: str, timeout: int = 120) -> List[float]:
     return vector
 
 
+
+   
 def _parse_embedding(stdout: str) -> Optional[List[float]]:
     """
     Extract embedding vector from llama-embedding stdout.
 
-    Format expected:
-        embedding: 0.123, -0.456, 0.789, ...
-
-    Returns None if no embedding line found.
+    Strategy: scan all lines, find the line (or set of lines)
+    with the most floats. Return that as the vector.
     """
+    import re
+    pattern = r"-?\d+\.\d+(?:[eE][+-]?\d+)?"
+
+    best: List[float] = []
+
     for line in stdout.splitlines():
-        if not line.startswith("embedding:"):
-            continue
-        raw = line.replace("embedding:", "").strip()
-        try:
-            return [float(n.strip()) for n in raw.split(",") if n.strip()]
-        except ValueError:
-            return None
+        nums = [float(x) for x in re.findall(pattern, line)]
+        if len(nums) > len(best):
+            best = nums
+        elif nums and len(best) < EXPECTED_DIM:
+            # Try accumulating across lines
+            combined = best + nums
+            if len(combined) <= EXPECTED_DIM * 2:
+                best = combined
+
+    return best if best else None
     return None
 
 
