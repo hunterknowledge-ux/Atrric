@@ -1,0 +1,1 @@
+{"chunks": [{"id": "chunk_0", "text": "Gen Z suka TikTok", "vector": [1.0, 0.0, 0.0], "source": "test.txt"}, {"id": "chunk_1", "text": "Harga barang naik", "vector": [0.0, 1.0, 0.0], "source": "test.txt"}, {"id": "chunk_2", "text": "AI penting", "vector": [0.0, 0.0, 1.0], "source": "test.txt"}]}
