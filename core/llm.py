@@ -24,11 +24,13 @@ class LLMError(Exception):
 
 # Where the generated text ends.
 _STOP_MARKERS = (
+    "\nSoalan:",
+    "\nQuestion:",
+    "\nData:",
     "\n[ Prompt:",
     "\n[ Generation:",
     "\nExiting",
     "\n\n> ",
-    "\n> /exit",
 )
 
 
@@ -100,24 +102,23 @@ def _clean_output(raw: str, prompt: str) -> str:
     """
     Extract generated text from llama-cli stdout.
 
-    The output contains: banner, echoed prompt, generated text,
-    timing stats, exit message. We isolate only the generated part.
+    Strategy:
+      1. Strip ANSI codes and interactive-mode prefixes.
+      2. Strip the prompt echo (find prompt in output, take suffix).
+      3. Cut at the next 'Soalan:' / 'Data:' / stats marker.
+      4. Return stripped result.
     """
-    # Strip ANSI colors
+    # 1. Clean terminal artifacts
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
-
-    # Strip leading interactive prompts at line starts
     raw = re.sub(r"^> ", "", raw, flags=re.MULTILINE)
 
-    # Find last "Jawapan:" / "Answer:" marker to skip prompt echo
-    tail = raw
-    for marker in ("Jawapan:", "Answer:"):
-        idx = raw.rfind(marker)
-        if idx != -1:
-            tail = raw[idx + len(marker):]
-            break
+    # 2. Strip prompt echo
+    if prompt in raw:
+        tail = raw.rsplit(prompt, 1)[-1]
+    else:
+        tail = raw
 
-    # Cut at any stop marker
+    # 3. Cut at first stop marker
     for stop in _STOP_MARKERS:
         idx = tail.find(stop)
         if idx != -1:
