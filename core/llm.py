@@ -22,18 +22,6 @@ class LLMError(Exception):
     pass
 
 
-# Where the generated text ends.
-_STOP_MARKERS = (
-    "\nSoalan:",
-    "\nQuestion:",
-    "\nData:",
-    "\n[ Prompt:",
-    "\n[ Generation:",
-    "\nExiting",
-    "\n\n> ",
-)
-
-
 def generate(
     prompt: str,
     max_tokens: Optional[int] = None,
@@ -82,15 +70,15 @@ def generate(
         raise LLMError(f"Binary not found: {config.LLAMA_CLI}")
 
     if result.returncode != 0:
-    raise LLMError(
-        f"llama-cli exited with code {result.returncode}\n"
-        f"STDERR: {result.stderr[-300:]}"
-    )
+        raise LLMError(
+            f"llama-cli exited with code {result.returncode}\n"
+            f"STDERR: {result.stderr[-300:]}"
+        )
 
-combined = (result.stdout or "") + "\n" + (result.stderr or "")
-text = _clean_output(combined, prompt)
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+    text = _clean_output(combined, prompt)
 
-if not text:
+    if not text:
         raise LLMError(
             f"No generated text found.\n"
             f"STDOUT tail: {result.stdout[-400:]}"
@@ -103,14 +91,12 @@ def _clean_output(raw: str, prompt: str) -> str:
     """Extract text after last 'Jawapan:' marker."""
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
 
-    # Find last "Jawapan:" (model answer follows prompt echo)
     idx = raw.rfind("Jawapan:")
     if idx == -1:
         return raw.strip()[:500]
 
     tail = raw[idx + len("Jawapan:"):]
 
-    # Cut at stats / exit
     for stop in ("\n[ Prompt:", "\n[ Generation:", "\nExiting", "\n\n> "):
         stop_idx = tail.find(stop)
         if stop_idx != -1:
