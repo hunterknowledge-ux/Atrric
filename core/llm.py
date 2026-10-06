@@ -99,30 +99,21 @@ def generate(
 
 
 def _clean_output(raw: str, prompt: str) -> str:
-    """
-    Extract generated text from llama-cli stdout.
-
-    Strategy:
-      1. Strip ANSI codes and interactive-mode prefixes.
-      2. Strip the prompt echo (find prompt in output, take suffix).
-      3. Cut at the next 'Soalan:' / 'Data:' / stats marker.
-      4. Return stripped result.
-    """
-    # 1. Clean terminal artifacts
+    """Extract text after last 'Jawapan:' marker."""
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
-    raw = re.sub(r"^> ", "", raw, flags=re.MULTILINE)
 
-    # 2. Strip prompt echo
-    if prompt in raw:
-        tail = raw.rsplit(prompt, 1)[-1]
-    else:
-        tail = raw
+    # Find last "Jawapan:" (model answer follows prompt echo)
+    idx = raw.rfind("Jawapan:")
+    if idx == -1:
+        return raw.strip()[:500]
 
-    # 3. Cut at first stop marker
-    for stop in _STOP_MARKERS:
-        idx = tail.find(stop)
-        if idx != -1:
-            tail = tail[:idx]
+    tail = raw[idx + len("Jawapan:"):]
+
+    # Cut at stats / exit
+    for stop in ("\n[ Prompt:", "\n[ Generation:", "\nExiting", "\n\n> "):
+        stop_idx = tail.find(stop)
+        if stop_idx != -1:
+            tail = tail[:stop_idx]
 
     return tail.strip()
 
