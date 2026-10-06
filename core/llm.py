@@ -65,7 +65,6 @@ def generate(
         f'-n {n} '
         f'-t {config.THREADS} '
         f'-c {config.CONTEXT_SIZE} '
-        f'-r "{_IM_END}" '
         f'< /dev/null'
     )
 
