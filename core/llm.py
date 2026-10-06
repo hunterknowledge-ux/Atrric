@@ -27,62 +27,42 @@ def generate(
     max_tokens: Optional[int] = None,
     timeout: int = 300,
 ) -> str:
-    """
-    Generate text from a prompt using llama-cli.
-
-    Args:
-        prompt: The input prompt.
-        max_tokens: Max new tokens. Defaults to config.MAX_TOKENS.
-        timeout: Max seconds to wait.
-
-    Returns:
-        Cleaned generated text.
-
-    Raises:
-        ValueError: If prompt is empty.
-        LLMError: If subprocess fails or output is empty.
-    """
+    """Generate text via llama-cli, using file redirect to bypass tty issue."""
     if not prompt or not prompt.strip():
         raise ValueError("Cannot generate from empty prompt")
 
     n = max_tokens if max_tokens is not None else config.MAX_TOKENS
 
-    cmd = [
-        str(config.LLAMA_CLI),
-        "-m", str(config.SMOLLM_MODEL),
-        "-p", prompt,
-        "-n", str(n),
-        "-t", str(config.THREADS),
-        "-c", str(config.CONTEXT_SIZE),
-    ]
+    base = Path(config.VECTOR_STORE_FILE).parent
+    prompt_file = base / "_tmp_prompt.txt"
+    output_file = base / "_tmp_output.txt"
+
+    prompt_file.write_text(prompt, encoding="utf-8")
+
+    cmd = (
+        f'"{config.LLAMA_CLI}" -m "{config.SMOLLM_MODEL}" '
+        f'-f "{prompt_file}" -n {n} -t {config.THREADS} '
+        f'-c {config.CONTEXT_SIZE} < /dev/null '
+        f'> "{output_file}" 2>&1'
+    )
 
     try:
-        result = subprocess.run(
-            cmd,
-            input="/exit\n",
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        subprocess.run(cmd, shell=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise LLMError(f"Generation timed out after {timeout}s")
-    except FileNotFoundError:
-        raise LLMError(f"Binary not found: {config.LLAMA_CLI}")
 
-    if result.returncode != 0:
-        raise LLMError(
-            f"llama-cli exited with code {result.returncode}\n"
-            f"STDERR: {result.stderr[-300:]}"
-        )
+    if not output_file.exists():
+        raise LLMError("No output file created")
 
-    combined = (result.stdout or "") + "\n" + (result.stderr or "")
-    text = _clean_output(combined, prompt)
+    raw = output_file.read_text(encoding="utf-8")
+
+    prompt_file.unlink(missing_ok=True)
+    output_file.unlink(missing_ok=True)
+
+    text = _clean_output(raw, prompt)
 
     if not text:
-        raise LLMError(
-            f"No generated text found.\n"
-            f"STDOUT tail: {result.stdout[-400:]}"
-        )
+        raise LLMError(f"No generated text. Raw tail: {raw[-400:]}")
 
     return text
 
