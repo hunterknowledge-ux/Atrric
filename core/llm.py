@@ -87,7 +87,8 @@ def generate(
             f"STDERR: {result.stderr[-300:]}"
         )
 
-    text = _clean_output(result.stdout, prompt)
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+text = _clean_output(combined, prompt)
 
     if not text:
         raise LLMError(
