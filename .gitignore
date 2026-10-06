@@ -241,3 +241,15 @@ _pip_freeze_temp.txt
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Runtime outputs (from core/ modules)
+vector_store.json
+core/test_store.json
+poc_prompt.txt
+poc_pipeline.py
+
+# Local temp files
+_imports.txt
+_imports_temp.txt
+_pip_freeze_temp.txt
