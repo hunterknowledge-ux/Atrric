@@ -128,6 +128,35 @@ The architecture is complete. Core components are implemented. End-to-end verifi
 
 Limitations are published openly so contributors and users can calibrate expectations accurately.
 
+___
+
+### Verified Deployments
+
+The Atrric RAG pipeline components have been verified on minimum hardware:
+
+| Environment | Hardware | Model | Status |
+| :--- | :--- | :--- | :--- |
+| Android / Termux | Samsung A10s, 2GB RAM, ARMv7 (32-bit) | SmolLM2 135M + hourai2-50m embedding | Proof of concept |
+
+**llama.cpp compiled from source for ARMv7:**
+
+![Hardware and llama.cpp version](assets/screenshot-hardware.png)
+
+**Embedding and vector search working on-device:**
+
+![Embedding and cosine similarity search](assets/screenshot-embedding.png)
+
+**Notes on the phone deployment:**
+
+- `llama.cpp` was compiled from source (Clang 21.1.8, ARMv7 target) due to lack of official ARMv7 binaries.
+- Embedding runs at 128 dimensions via `hourai2-50m-embedding`.
+- Generation runs at ~2.5 tokens/second via SmolLM2 135M on a MediaTek Helio P22 CPU.
+- Output quality is limited by the 135M parameter model. The pipeline architecture itself is sound and works end-to-end.
+- Production deployments should target 1B–8B parameter models on machines with 8GB+ RAM.
+
+This deployment confirms the pipeline can operate on constrained hardware without external API calls, in line with Atrric's data-sovereignty goals.
+
+
 ---
 
 ## Quickstart
