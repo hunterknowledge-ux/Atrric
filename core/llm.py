@@ -61,7 +61,7 @@ def generate(
     inner_cmd = (
         f'"{config.LLAMA_CLI}" '
         f'-m "{config.SMOLLM_MODEL}" '
-        f'-f "{prompt_file}" '
+        f'-p "$(cat {prompt_file})" '
         f'-n {n} '
         f'-t {config.THREADS} '
         f'-c {config.CONTEXT_SIZE} '
