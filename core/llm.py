@@ -1,13 +1,17 @@
 """
-core/llm.py - LLM wrapper using llama-cli.
+core/llm.py - LLM wrapper using llama-cli with PTY capture.
 
-Runs llama-cli via `script` (pseudo-terminal) to capture output,
-then extracts the generated answer from SmolLM2 chat template.
+llama.cpp writes to /dev/tty directly. To capture output, we run it
+inside a pseudo-terminal (PTY) that we control from Python.
 """
 
+import os
+import pty
 import re
+import select
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -22,8 +26,6 @@ class LLMError(Exception):
     pass
 
 
-# SmolLM2 chat template markers
-_IM_START = "<|im_start|>"
 _IM_END = "<|im_end|>"
 
 
@@ -33,10 +35,10 @@ def generate(
     timeout: int = 300,
 ) -> str:
     """
-    Generate text via llama-cli using pseudo-terminal capture.
+    Generate text via llama-cli, capturing PTY output.
 
     Args:
-        prompt: The input prompt (should already use chat template).
+        prompt: Input prompt (chat template format recommended).
         max_tokens: Max new tokens. Defaults to config.MAX_TOKENS.
         timeout: Max seconds to wait.
 
@@ -52,61 +54,109 @@ def generate(
 
     n = max_tokens if max_tokens is not None else config.MAX_TOKENS
 
-    base = Path(config.VECTOR_STORE_FILE).parent
-    prompt_file = base / "_tmp_prompt.txt"
-    output_file = base / "_tmp_output.txt"
+    cmd = [
+        str(config.LLAMA_CLI),
+        "-m", str(config.SMOLLM_MODEL),
+        "-p", prompt,
+        "-n", str(n),
+        "-t", str(config.THREADS),
+        "-c", str(config.CONTEXT_SIZE),
+    ]
 
-    prompt_file.write_text(prompt, encoding="utf-8")
-
-    inner_cmd = (
-        f'"{config.LLAMA_CLI}" '
-        f'-m "{config.SMOLLM_MODEL}" '
-        f'-p "$(cat {prompt_file})" '
-        f'-n {n} '
-        f'-t {config.THREADS} '
-        f'-c {config.CONTEXT_SIZE} '
-        f'< /dev/null'
-    )
-
-    cmd = f'script -q -c \'{inner_cmd}\' "{output_file}"'
+    master_fd, slave_fd = pty.openpty()
+    proc = None
 
     try:
-        subprocess.run(cmd, shell=True, timeout=timeout, capture_output=True)
-    except subprocess.TimeoutExpired:
-        raise LLMError(f"Generation timed out after {timeout}s")
+        proc = subprocess.Popen(
+            cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+        )
+        os.close(slave_fd)
+        slave_fd = -1
 
-    if not output_file.exists():
-        raise LLMError("No output file created")
+        chunks = []
+        deadline = time.time() + timeout
+        last_output = time.time()
+        exit_sent = False
 
-    raw = output_file.read_text(encoding="utf-8")
+        while True:
+            if time.time() > deadline:
+                proc.kill()
+                break
 
-    prompt_file.unlink(missing_ok=True)
-    output_file.unlink(missing_ok=True)
+            try:
+                r, _, _ = select.select([master_fd], [], [], 1.0)
+            except (OSError, ValueError):
+                break
+
+            if r:
+                try:
+                    data = os.read(master_fd, 8192)
+                    if data:
+                        chunks.append(data)
+                        last_output = time.time()
+                except OSError:
+                    break
+
+            if proc.poll() is not None:
+                break
+
+            # After 4s idle, assume generation done, send /exit
+            if not exit_sent and (time.time() - last_output) > 4:
+                try:
+                    os.write(master_fd, b"/exit\n")
+                    exit_sent = True
+                except OSError:
+                    break
+
+    finally:
+        if slave_fd != -1:
+            try:
+                os.close(slave_fd)
+            except OSError:
+                pass
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+
+    if proc is not None:
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+    raw = b"".join(chunks).decode("utf-8", errors="replace")
+
+    if not raw.strip():
+        raise LLMError("llama-cli produced no output")
 
     text = _clean_output(raw, prompt)
 
     if not text:
-        raise LLMError(f"No generated text. Raw tail: {raw[-400:]}")
+        raise LLMError(f"No text extracted. Raw tail: {raw[-400:]}")
 
     return text
 
 
 def _clean_output(raw: str, prompt: str) -> str:
-    """
-    Extract assistant response from chat template output.
-
-    Looks for the last '<|im_start|>assistant' marker and takes
-    everything up to the next '<|im_end|>' or stats line.
-    """
+    """Extract assistant response from captured PTY output."""
+    # Strip ANSI colors
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
 
-    marker = f"{_IM_START}assistant"
+    # Strip interactive prompt prefix at line starts
+    raw = re.sub(r"^> ", "", raw, flags=re.MULTILINE)
+
+    # Prefer chat template marker
+    marker = "<|im_start|>assistant"
     idx = raw.rfind(marker)
 
     if idx != -1:
         tail = raw[idx + len(marker):]
     else:
-        # Fallback: try "Jawapan:"
         idx = raw.rfind("Jawapan:")
         if idx != -1:
             tail = raw[idx + len("Jawapan:"):]
@@ -119,6 +169,7 @@ def _clean_output(raw: str, prompt: str) -> str:
         "\n[ Prompt:",
         "\n[ Generation:",
         "\nExiting",
+        "\n> /exit",
         "\n\n> ",
     ):
         stop_idx = tail.find(stop)
@@ -130,10 +181,10 @@ def _clean_output(raw: str, prompt: str) -> str:
 
 if __name__ == "__main__":
     test_prompt = (
-        f"{_IM_START}user\n"
-        f"Apa itu Gen Z?\n"
-        f"{_IM_END}\n"
-        f"{_IM_START}assistant\n"
+        "<|im_start|>user\n"
+        "Apa itu Gen Z?\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n"
     )
     out = generate(test_prompt, max_tokens=40)
     print("--- Generated ---")
