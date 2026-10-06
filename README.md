@@ -1,4 +1,3 @@
-```markdown
 # Atrric
 
 **Sovereign RAG infrastructure for Malaysian market intelligence.**
