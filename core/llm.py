@@ -82,15 +82,15 @@ def generate(
         raise LLMError(f"Binary not found: {config.LLAMA_CLI}")
 
     if result.returncode != 0:
-        raise LLMError(
-            f"llama-cli exited with code {result.returncode}\n"
-            f"STDERR: {result.stderr[-300:]}"
-        )
+    raise LLMError(
+        f"llama-cli exited with code {result.returncode}\n"
+        f"STDERR: {result.stderr[-300:]}"
+    )
 
-    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+combined = (result.stdout or "") + "\n" + (result.stderr or "")
 text = _clean_output(combined, prompt)
 
-    if not text:
+if not text:
         raise LLMError(
             f"No generated text found.\n"
             f"STDOUT tail: {result.stdout[-400:]}"
