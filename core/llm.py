@@ -1,8 +1,8 @@
 """
 core/llm.py - LLM wrapper using llama-cli.
 
-Runs llama-cli, feeds the prompt, sends /exit via stdin to close
-the interactive session, and returns the cleaned generated text.
+Runs llama-cli via `script` (pseudo-terminal) to capture output,
+then extracts the generated answer.
 """
 
 import re
@@ -27,7 +27,24 @@ def generate(
     max_tokens: Optional[int] = None,
     timeout: int = 300,
 ) -> str:
-    """Generate text via llama-cli, using file redirect to bypass tty issue."""
+    """
+    Generate text via llama-cli using pseudo-terminal capture.
+
+    Uses `script` to allocate a PTY so llama-cli writes to a captured
+    stream instead of the real terminal.
+
+    Args:
+        prompt: The input prompt.
+        max_tokens: Max new tokens. Defaults to config.MAX_TOKENS.
+        timeout: Max seconds to wait.
+
+    Returns:
+        Cleaned generated text.
+
+    Raises:
+        ValueError: If prompt is empty.
+        LLMError: If subprocess fails or output is empty.
+    """
     if not prompt or not prompt.strip():
         raise ValueError("Cannot generate from empty prompt")
 
@@ -39,15 +56,20 @@ def generate(
 
     prompt_file.write_text(prompt, encoding="utf-8")
 
-    cmd = (
-        f'"{config.LLAMA_CLI}" -m "{config.SMOLLM_MODEL}" '
-        f'-f "{prompt_file}" -n {n} -t {config.THREADS} '
-        f'-c {config.CONTEXT_SIZE} < /dev/null '
-        f'> "{output_file}" 2>&1'
+    inner_cmd = (
+        f'"{config.LLAMA_CLI}" '
+        f'-m "{config.SMOLLM_MODEL}" '
+        f'-f "{prompt_file}" '
+        f'-n {n} '
+        f'-t {config.THREADS} '
+        f'-c {config.CONTEXT_SIZE} '
+        f'< /dev/null'
     )
 
+    cmd = f'script -q -c \'{inner_cmd}\' "{output_file}"'
+
     try:
-        subprocess.run(cmd, shell=True, timeout=timeout)
+        subprocess.run(cmd, shell=True, timeout=timeout, capture_output=True)
     except subprocess.TimeoutExpired:
         raise LLMError(f"Generation timed out after {timeout}s")
 
