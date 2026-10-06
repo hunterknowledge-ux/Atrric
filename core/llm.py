@@ -112,6 +112,20 @@ def generate(
                 except OSError:
                     break
 
+        # Drain remaining PTY data after process exit
+        time.sleep(0.5)
+        while True:
+            try:
+                r, _, _ = select.select([master_fd], [], [], 0.3)
+                if not r:
+                    break
+                data = os.read(master_fd, 8192)
+                if not data:
+                    break
+                chunks.append(data)
+            except OSError:
+                break
+
     finally:
         if slave_fd != -1:
             try:
