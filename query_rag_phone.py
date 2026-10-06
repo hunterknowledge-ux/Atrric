@@ -2,7 +2,7 @@
 query_rag_phone.py - Query the RAG index (phone mode).
 
 Takes a user question, embeds it, searches the vector store,
-builds a prompt with retrieved context, and calls the LLM.
+builds a SmolLM2 chat-template prompt, and calls the LLM.
 """
 
 import argparse
@@ -55,14 +55,19 @@ def query(question: str, top_k: int = None) -> None:
         print(f"  [{i}] score={r['score']:.4f} | {preview}...")
     print()
 
-    # Build context from top results
+    # Build context
     context = "\n\n".join(r["chunk"]["text"] for r in results)
 
-    # Build prompt
-    prompt = (
+    # Build prompt using SmolLM2 chat template
+    user_msg = (
+        f"Jawab soalan berdasarkan data ini sahaja. "
+        f"Jika data tidak mencukupi, katakan tidak tahu.\n\n"
         f"Data:\n{context}\n\n"
-        f"Soalan: {question}\n"
-        f"Jawapan:"
+        f"Soalan: {question}"
+    )
+    prompt = (
+        f"<|im_start|>user\n{user_msg}<|im_end|>\n"
+        f"<|im_start|>assistant\n"
     )
 
     # Generate
