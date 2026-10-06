@@ -2,7 +2,7 @@
 core/llm.py - LLM wrapper using llama-cli.
 
 Runs llama-cli via `script` (pseudo-terminal) to capture output,
-then extracts the generated answer.
+then extracts the generated answer from SmolLM2 chat template.
 """
 
 import re
@@ -22,6 +22,11 @@ class LLMError(Exception):
     pass
 
 
+# SmolLM2 chat template markers
+_IM_START = "<|im_start|>"
+_IM_END = "<|im_end|>"
+
+
 def generate(
     prompt: str,
     max_tokens: Optional[int] = None,
@@ -30,11 +35,8 @@ def generate(
     """
     Generate text via llama-cli using pseudo-terminal capture.
 
-    Uses `script` to allocate a PTY so llama-cli writes to a captured
-    stream instead of the real terminal.
-
     Args:
-        prompt: The input prompt.
+        prompt: The input prompt (should already use chat template).
         max_tokens: Max new tokens. Defaults to config.MAX_TOKENS.
         timeout: Max seconds to wait.
 
@@ -63,6 +65,7 @@ def generate(
         f'-n {n} '
         f'-t {config.THREADS} '
         f'-c {config.CONTEXT_SIZE} '
+        f'-r "{_IM_END}" '
         f'< /dev/null'
     )
 
@@ -90,16 +93,35 @@ def generate(
 
 
 def _clean_output(raw: str, prompt: str) -> str:
-    """Extract text after last 'Jawapan:' marker."""
+    """
+    Extract assistant response from chat template output.
+
+    Looks for the last '<|im_start|>assistant' marker and takes
+    everything up to the next '<|im_end|>' or stats line.
+    """
     raw = re.sub(r"\x1b\[[0-9;]*m", "", raw)
 
-    idx = raw.rfind("Jawapan:")
-    if idx == -1:
-        return raw.strip()[:500]
+    marker = f"{_IM_START}assistant"
+    idx = raw.rfind(marker)
 
-    tail = raw[idx + len("Jawapan:"):]
+    if idx != -1:
+        tail = raw[idx + len(marker):]
+    else:
+        # Fallback: try "Jawapan:"
+        idx = raw.rfind("Jawapan:")
+        if idx != -1:
+            tail = raw[idx + len("Jawapan:"):]
+        else:
+            tail = raw
 
-    for stop in ("\n[ Prompt:", "\n[ Generation:", "\nExiting", "\n\n> "):
+    # Cut at stop markers
+    for stop in (
+        _IM_END,
+        "\n[ Prompt:",
+        "\n[ Generation:",
+        "\nExiting",
+        "\n\n> ",
+    ):
         stop_idx = tail.find(stop)
         if stop_idx != -1:
             tail = tail[:stop_idx]
@@ -109,10 +131,10 @@ def _clean_output(raw: str, prompt: str) -> str:
 
 if __name__ == "__main__":
     test_prompt = (
-        "Data:\n"
-        "Gen Z Malaysia suka TikTok dan Instagram.\n\n"
-        "Soalan: Apa platform kegemaran Gen Z?\n"
-        "Jawapan:"
+        f"{_IM_START}user\n"
+        f"Apa itu Gen Z?\n"
+        f"{_IM_END}\n"
+        f"{_IM_START}assistant\n"
     )
     out = generate(test_prompt, max_tokens=40)
     print("--- Generated ---")
