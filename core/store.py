@@ -128,18 +128,29 @@ def search(
 
 
 if __name__ == "__main__":
-    # Self-test
+    # Self-test with 128D vectors (matching config.EMBED_DIM)
     print("PocketVectorDB wrapper self-test...")
 
+    dim = config.EMBED_DIM
+
+    def make_vec(seed: int) -> List[float]:
+        """Deterministic 128D pseudo-random vector."""
+        np.random.seed(seed)
+        v = np.random.randn(dim).astype(np.float32)
+        return (v / np.linalg.norm(v)).tolist()
+
     chunks = []
-    add_chunk(chunks, "Gen Z suka TikTok", [1.0, 0.0, 0.0], "test.txt")
-    add_chunk(chunks, "Harga barang naik", [0.0, 1.0, 0.0], "test.txt")
-    add_chunk(chunks, "AI penting", [0.0, 0.0, 1.0], "test.txt")
+    add_chunk(chunks, "Gen Z suka TikTok", make_vec(1), "test.txt")
+    add_chunk(chunks, "Harga barang naik", make_vec(2), "test.txt")
+    add_chunk(chunks, "AI penting", make_vec(3), "test.txt")
 
     loaded = load()
     print(f"Store has {len(loaded)} chunks")
 
-    results = search([0.9, 0.1, 0.0], top_k=2)
+    # Query with vector similar to first chunk
+    q = make_vec(1)
+    q[0] += 0.05
+    results = search(q, top_k=2)
     print("Top results:")
     for r in results:
         print(f"  score={r['score']:.4f} | {r['chunk']['text']}")
