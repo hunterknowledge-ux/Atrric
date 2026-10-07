@@ -61,8 +61,12 @@ def load(path: Optional[Path] = None) -> List[Dict]:
 
 
 def save(chunks: List[Dict], path: Optional[Path] = None) -> None:
-    """No-op. PocketVectorDB persists on every add()."""
-    return
+    """Explicit persist. PocketVectorDB may not auto-save on process exit."""
+    db = _get_db()
+    try:
+        db.save()
+    except Exception as e:
+        raise StoreError(f"Failed to save: {e}") from e
 
 
 def add_chunk(
