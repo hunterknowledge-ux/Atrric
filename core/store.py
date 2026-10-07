@@ -1,28 +1,26 @@
 """
-core/store.py - Simple JSON vector store.
+core/store.py - Vector store wrapper using PocketVectorDB.
 
-Stores chunks with their embedding vectors in a JSON file.
-Search uses cosine similarity (pure Python, no numpy needed).
+Persistent, cosine-similarity search on ARMv7/Termux.
+Replaces the previous JSON+numpy implementation.
 
-Format of vector_store.json:
-{
-  "chunks": [
-    {"id": "chunk_0", "text": "...", "vector": [...], "source": "..."},
-    ...
-  ]
-}
+PocketVectorDB API (verified 2026-10):
+    add(embedding, metadata=None, text=None) -> str
+    query(embedding, n_results=10) -> {ids, documents, metadatas, distances}
+    count() -> int
 """
 
-import json
-import math
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import numpy as np
 
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
+from pocketvectordb import VectorDB
 
 
 class StoreError(Exception):
@@ -30,27 +28,41 @@ class StoreError(Exception):
     pass
 
 
+_db: Optional[VectorDB] = None
+
+
+def _get_db() -> VectorDB:
+    """Get or create the PocketVectorDB instance (singleton)."""
+    global _db
+    if _db is None:
+        try:
+            _db = VectorDB(
+                storage_path=str(config.POCKET_VECTOR_DIR),
+                dimension=config.EMBED_DIM,
+            )
+        except Exception as e:
+            raise StoreError(f"Failed to open PocketVectorDB: {e}") from e
+    return _db
+
+
 def load(path: Optional[Path] = None) -> List[Dict]:
-    """Load chunks from JSON file. Returns empty list if file missing."""
-    path = path or config.VECTOR_STORE_FILE
-    if not path.exists():
-        return []
+    """
+    Return a list with length = number of chunks in store.
+
+    Used by callers to check "is store empty?".
+    Actual data is retrieved via search().
+    """
+    db = _get_db()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data.get("chunks", [])
-    except (json.JSONDecodeError, OSError) as e:
-        raise StoreError(f"Failed to load store: {e}") from e
+        n = db.count()
+    except Exception as e:
+        raise StoreError(f"Failed to read count: {e}") from e
+    return [{"id": i} for i in range(n)]
 
 
 def save(chunks: List[Dict], path: Optional[Path] = None) -> None:
-    """Save chunks to JSON file."""
-    path = path or config.VECTOR_STORE_FILE
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({"chunks": chunks}, f, ensure_ascii=False)
-    except OSError as e:
-        raise StoreError(f"Failed to save store: {e}") from e
+    """No-op. PocketVectorDB persists on every add()."""
+    return
 
 
 def add_chunk(
@@ -59,31 +71,21 @@ def add_chunk(
     vector: List[float],
     source: str,
 ) -> Dict:
-    """Append one chunk to the list. Returns the new chunk."""
-    chunk = {
-        "id": f"chunk_{len(chunks)}",
-        "text": text,
-        "vector": vector,
-        "source": source,
-    }
+    """Add one chunk. Returns {id, text, source}."""
+    db = _get_db()
+    try:
+        vec = np.array(vector, dtype=np.float32)
+        doc_id = db.add(
+            vec,
+            metadata={"source": source},
+            text=text,
+        )
+    except Exception as e:
+        raise StoreError(f"Failed to add chunk: {e}") from e
+
+    chunk = {"id": doc_id, "text": text, "source": source}
     chunks.append(chunk)
     return chunk
-
-
-def cosine_similarity(a: List[float], b: List[float]) -> float:
-    """Pure-python cosine similarity between two vectors."""
-    if len(a) != len(b):
-        raise ValueError(f"Vector length mismatch: {len(a)} vs {len(b)}")
-    dot = 0.0
-    na = 0.0
-    nb = 0.0
-    for x, y in zip(a, b):
-        dot += x * y
-        na += x * x
-        nb += y * y
-    if na == 0.0 or nb == 0.0:
-        return 0.0
-    return dot / (math.sqrt(na) * math.sqrt(nb))
 
 
 def search(
@@ -92,46 +94,52 @@ def search(
     chunks: Optional[List[Dict]] = None,
 ) -> List[Dict]:
     """
-    Find top_k most similar chunks to query_vector.
+    Find top_k most similar chunks.
 
-    Returns list of dicts: {chunk, score} sorted by score descending.
+    Returns list of {chunk: {id, text, source}, score}.
+    Score = 1 - cosine_distance (range -1 to 1, higher = more similar).
     """
-    if chunks is None:
-        chunks = load()
+    db = _get_db()
+    try:
+        q = np.array(query_vector, dtype=np.float32)
+        results = db.query(q, n_results=top_k)
+    except Exception as e:
+        raise StoreError(f"Search failed: {e}") from e
 
-    if not chunks:
-        return []
+    ids = results.get("ids", [])
+    docs = results.get("documents", [])
+    metas = results.get("metadatas", [])
+    dists = results.get("distances", [])
 
-    scored = []
-    for chunk in chunks:
-        vec = chunk.get("vector")
-        if not vec:
-            continue
-        try:
-            score = cosine_similarity(query_vector, vec)
-        except ValueError:
-            continue
-        scored.append({"chunk": chunk, "score": score})
-
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    return scored[:top_k]
+    out = []
+    for i in range(len(ids)):
+        dist = float(dists[i]) if i < len(dists) else 0.0
+        score = 1.0 - dist
+        meta = metas[i] if i < len(metas) and isinstance(metas[i], dict) else {}
+        out.append({
+            "chunk": {
+                "id": ids[i],
+                "text": docs[i] if i < len(docs) else "",
+                "source": meta.get("source", "unknown"),
+            },
+            "score": score,
+        })
+    return out
 
 
 if __name__ == "__main__":
-    # Self-test: create store with dummy vectors
-    test_path = Path(__file__).parent / "test_store.json"
-    if test_path.exists():
-        test_path.unlink()
+    # Self-test
+    print("PocketVectorDB wrapper self-test...")
 
     chunks = []
     add_chunk(chunks, "Gen Z suka TikTok", [1.0, 0.0, 0.0], "test.txt")
     add_chunk(chunks, "Harga barang naik", [0.0, 1.0, 0.0], "test.txt")
     add_chunk(chunks, "AI penting", [0.0, 0.0, 1.0], "test.txt")
-    save(chunks, test_path)
 
-    loaded = load(test_path)
-    print(f"Loaded {len(loaded)} chunks")
+    loaded = load()
+    print(f"Store has {len(loaded)} chunks")
 
-    results = search([0.9, 0.1, 0.0], top_k=2, chunks=loaded)
+    results = search([0.9, 0.1, 0.0], top_k=2)
+    print("Top results:")
     for r in results:
         print(f"  score={r['score']:.4f} | {r['chunk']['text']}")
