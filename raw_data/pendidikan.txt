@@ -1,1 +1,3 @@
 # raw data — pendidikan
+# format: OP + replies (flat)
+# note: aggregate data, no age filter
