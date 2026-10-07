@@ -253,3 +253,8 @@ poc_pipeline.py
 _imports.txt
 _imports_temp.txt
 _pip_freeze_temp.txt
+
+# PocketVectorDB runtime data
+pocket_vectordb/
+test_pocket/
+test_pocket2/
