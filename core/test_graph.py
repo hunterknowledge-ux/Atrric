@@ -11,13 +11,13 @@ from core.rag import RAG
 def build_dummy_graph():
     """3 node + 2 edge — tema Gen Z/TikTok/viral."""
     nodes = [
-        Node(id="tiktok", kind="platform", name="TikTok"),
-        Node(id="genz", kind="demographic", name="Gen Z"),
-        Node(id="viral", kind="concept", name="Viral"),
+        Node(id="TikTok", kind="platform"),
+        Node(id="Gen Z", kind="demographic"),
+        Node(id="Viral", kind="concept"),
     ]
     triples = [
-        Triple(s="genz", p="uses", o="tiktok"),
-        Triple(s="tiktok", p="causes", o="viral"),
+        Triple(s="Gen Z", p="uses", o="TikTok"),
+        Triple(s="TikTok", p="causes", o="Viral"),
     ]
     return InMemoryGraph(nodes=nodes, triples=triples)
 
@@ -29,11 +29,11 @@ def test_primitives():
     hits = g.search_labels("TikTok")
     print(f"  search_labels('TikTok'): {len(hits)} hits")
     for node, score in hits[:3]:
-        print(f"    {score:.3f} | {node.id} ({node.name})")
+        print(f"    {score:.3f} | {node.id} ({node.kind})")
 
     try:
-        nbrs = g.neighbors("genz", direction="both")
-        print(f"  neighbors('genz'): {len(nbrs)} facts")
+        nbrs = g.neighbors("Gen Z", direction="both")
+        print(f"  neighbors('Gen Z'): {len(nbrs)} facts")
         for f in nbrs[:3]:
             print(f"    {f}")
     except Exception as e:
