@@ -31,12 +31,18 @@ def test_primitives():
         print(f"    {score:.3f} | {node.id} ({node.label})")
 
     try:
-        nbrs = g.neighbors("gen-z", direction="both")
+        nbrs = g.neighbors("gen-z", hops=1, limit=10)
         print(f"  neighbors('gen-z'): {len(nbrs)} facts")
         for f in nbrs[:3]:
             print(f"    {f}")
     except Exception as e:
         print(f"  neighbors error: {type(e).__name__}: {e}")
+
+    try:
+        nids = g.neighbor_ids("gen-z", limit=10, direction="both")
+        print(f"  neighbor_ids('gen-z'): {nids}")
+    except Exception as e:
+        print(f"  neighbor_ids error: {type(e).__name__}: {e}")
 
 
 def test_rag():
