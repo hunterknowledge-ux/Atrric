@@ -35,11 +35,11 @@ class PocketVectorStore:
             vec = c.embedding if c.embedding else core_embed.embed(c.text)
             core_store.add_chunk([], c.text, vec, c.title or "unknown")
         core_store.save([])
-        return ChunkMutationResult(inserted=len(chunks), result=True)
+        return ChunkMutationResult(inserted=len(chunks), rebuilt=True)
 
     def delete_chunks(self, ids: list[str]) -> ChunkMutationResult:
         # PocketVectorDB tak support delete native
-        return ChunkMutationResult(missing=len(ids), result=False)
+        return ChunkMutationResult(missing=len(ids), rebuilt=False)
 
     # --- internal ---
 
