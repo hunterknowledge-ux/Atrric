@@ -22,7 +22,7 @@ class PocketVectorStore:
     # --- VectorStore protocol ---
 
     def search(self, query: str, *, limit: int = 20) -> list[tuple[Chunk, float]]:
-        vec = core_embed.get_embedding(query)
+        vec = core_embed.embed(query)
         results = core_store.search(vec, top_k=limit)
         return [(self._to_chunk(r["chunk"]), float(r["score"])) for r in results]
 
@@ -32,7 +32,7 @@ class PocketVectorStore:
 
     def upsert_chunks(self, chunks: list[Chunk]) -> ChunkMutationResult:
         for c in chunks:
-            vec = c.embedding if c.embedding else core_embed.get_embedding(c.text)
+            vec = c.embedding if c.embedding else core_embed.embed(c.text)
             core_store.add_chunk([], c.text, vec, c.title or "unknown")
         core_store.save([])
         return ChunkMutationResult(inserted=len(chunks), result=True)
