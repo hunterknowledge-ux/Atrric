@@ -280,3 +280,5 @@ logs/
 # Python cache
 __pycache__/
 *.pyc
+*.db
+test_graph.db
