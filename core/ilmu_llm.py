@@ -63,6 +63,7 @@ class IlmuLLM:
             raise IlmuError(f"Connection failed: {e}") from e
 
         self.last_usage = data.get("usage", {})
+_usage.log_call(self.model, self.last_usage)
         choices = data.get("choices", [])
         if not choices:
             raise IlmuError(f"No choices in response: {data}")
