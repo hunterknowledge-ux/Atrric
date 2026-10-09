@@ -12,6 +12,7 @@ import os
 import urllib.error
 import urllib.request
 
+from core import usage as _usage
 
 class IlmuError(Exception):
     pass
