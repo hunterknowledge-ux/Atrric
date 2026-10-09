@@ -25,3 +25,19 @@ It is not applied here.
 - Only include comments that carry substance (conversation).
 - Exclude: emoji-only comments, spam, advertisements.
 - Strip usernames, full names, and photos before saving.
+
+## Raw Data Format
+
+All `.txt` files under `raw_data/` follow this format.
+
+### Structure
+
+```
+
+[Thread n]
+OP: <original post>
+
+R: <reply to OP>
+R:R: <reply to R:>
+R:R:R: <reply to R:R:>
+R: <new chain, reply to OP>
