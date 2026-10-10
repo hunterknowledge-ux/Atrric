@@ -3,7 +3,7 @@
 # level: R: = reply to OP, R:R: = reply to R:, R:R:R: = level 3
 # note: aggregate data, no age filter
 
-[Threads 1]
+[Post 1]
 OP: "Gen Z lemah,Gen Z macam strawberi"
     meanwhile segelintir parents Milenials:
    -cikgu tak balas ws,SISPAA
