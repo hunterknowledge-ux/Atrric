@@ -52,3 +52,51 @@ class RAG:
             self._engine.close()
         except Exception:
             pass
+
+# ─────────────────────────────────────────────────
+# Contract untuk frontend
+# ─────────────────────────────────────────────────
+
+_RAG_INSTANCE = None
+
+
+def _get_rag():
+    """Lazy singleton."""
+    global _RAG_INSTANCE
+    if _RAG_INSTANCE is None:
+        from core.ilmu_llm import IlmuLLM
+        _RAG_INSTANCE = RAG(llm=IlmuLLM())
+    return _RAG_INSTANCE
+
+
+def answer_question(q: str, top_k: int = 3) -> dict:
+    """
+    Entry point untuk frontend/layer lain.
+
+    Returns:
+        {"answer": str, "sources": list[str]}
+
+    Raises:
+        ValueError: q kosong
+        RuntimeError: pipeline fail
+    """
+    if not q or not q.strip():
+        raise ValueError("Query kosong")
+
+    rag = _get_rag()
+    try:
+        result = rag.search(q, synthesize=True)
+    except Exception as e:
+        raise RuntimeError(f"RAG pipeline failed: {e}") from e
+
+    sources = []
+    chunks = getattr(result, "chunks", None) or []
+    for c in chunks[:top_k]:
+        src = getattr(c, "title", "") or ""
+        if src and src not in sources:
+            sources.append(src)
+
+    return {
+        "answer": getattr(result, "answer", "") or "",
+        "sources": sources,  # filename je — ["pendidikan.txt"]
+    }
