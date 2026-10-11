@@ -10,12 +10,14 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
+import numpy as np
+
 # Add repo root to path so `import config` works
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
 
-# Expected embedding dimension (hourai2-50m = 384)
+# Expected embedding dimension (hourai2-50m = 128)
 EXPECTED_DIM = 128
 
 
@@ -73,7 +75,7 @@ def embed(text: str, timeout: int = 120) -> List[float]:
 
     if vector is None:
         raise EmbedError(
-            f"No embedding line found in output.\n"
+            f"No embedding found in output.\n"
             f"STDOUT: {result.stdout[-300:]}"
         )
 
@@ -86,26 +88,28 @@ def embed(text: str, timeout: int = 120) -> List[float]:
     return vector
 
 
-
-   
 def _parse_embedding(stdout: str) -> Optional[List[float]]:
-    """Extract 128-dim vector. Ambil line dengan paling banyak nombor,
-    tapi reject kalau lebih dari EXPECTED_DIM."""
+    """Extract 128-dim vector.
+
+    Model output multi-chunk untuk text panjang. Setiap chunk = 128 dims,
+    disebar multi-line. Flatten semua nombor, then mean-pool kalau lebih 128.
+    """
     import re
+
     pattern = r"-?\d+\.\d+(?:[eE][+-]?\d+)?"
+    nums = [float(x) for x in re.findall(pattern, stdout)]
+    if not nums:
+        return None
 
-    best: List[float] = []
-    for line in stdout.splitlines():
-        nums = [float(x) for x in re.findall(pattern, line)]
-        # Skip line kalau ada lebih dari EXPECTED_DIM (bukan vector line)
-        if len(nums) > EXPECTED_DIM:
-            continue
-        if len(nums) > len(best):
-            best = nums
+    arr = np.array(nums, dtype=np.float32)
 
-    # Return only kalau betul-betul 128 (atau closer)
-    return best if best else None
-    return None
+    # Kalau lebih 128, reshape (n, 128) + mean pool
+    if len(arr) > EXPECTED_DIM:
+        n = len(arr) // EXPECTED_DIM
+        arr = arr[:n * EXPECTED_DIM].reshape(n, EXPECTED_DIM)
+        arr = arr.mean(axis=0)
+
+    return arr.tolist()
 
 
 if __name__ == "__main__":
