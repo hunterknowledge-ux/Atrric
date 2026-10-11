@@ -36,7 +36,7 @@ EMBED_MODEL = Path.home() / "hourai2-embed.gguf"
 VECTOR_STORE_FILE = ROOT_DIR / "vector_store.json"
 # PocketVectorDB (preferred for phone)
 POCKET_VECTOR_DIR = ROOT_DIR / "pocket_vectordb"
-EMBED_DIM = 128
+EMBED_DIM = 1024
 
 # ======================================================================
 # PIPELINE SETTINGS
