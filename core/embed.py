@@ -1,24 +1,17 @@
 """
-core/embed.py - Embedding wrapper using llama-embedding.
+core/embed.py — Embedding wrapper using ILMU bge-m3 API.
 
-Calls the llama-embedding binary with the configured model,
-parses the output, and returns a vector as a list of floats.
+Zero local deps. Guna urllib sahaja.
+Interface sama: embed(text) -> list[float] (1024 dims)
 """
 
-import subprocess
-import sys
-from pathlib import Path
-from typing import List, Optional
+import json
+import os
+import urllib.error
+import urllib.request
 
-import numpy as np
-
-# Add repo root to path so `import config` works
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-import config
-
-# Expected embedding dimension (hourai2-50m = 128)
-EXPECTED_DIM = 128
+# Expected dimension (bge-m3)
+EXPECTED_DIM = 1024
 
 
 class EmbedError(Exception):
@@ -26,93 +19,75 @@ class EmbedError(Exception):
     pass
 
 
-def embed(text: str, timeout: int = 120) -> List[float]:
+_DEFAULT_URL = "https://api.ilmu.ai/v1"
+_DEFAULT_MODEL = "bge-m3"
+
+
+def embed(text: str, timeout: int = 60, model: str = None, api_key: str = None) -> list:
     """
-    Generate an embedding vector for the given text.
+    Generate embedding vector via ILMU bge-m3.
 
     Args:
         text: Input text to embed.
-        timeout: Max seconds to wait for llama-embedding.
+        timeout: Max seconds to wait.
+        model: Override model (default: bge-m3).
+        api_key: Override key (default: from env ILMU_API_KEY).
 
     Returns:
-        List of floats representing the embedding vector.
+        List of 1024 floats.
 
     Raises:
         ValueError: If text is empty.
-        EmbedError: If subprocess fails, times out, or output is unparsable.
+        EmbedError: If API fails.
     """
     if not text or not text.strip():
         raise ValueError("Cannot embed empty text")
 
-    cmd = [
-        str(config.LLAMA_EMBED),
-        "-m", str(config.EMBED_MODEL),
-        "-p", text,
-        "--pooling", "mean",
-        "-c", str(config.CONTEXT_SIZE),
-        "-t", str(config.THREADS),
-    ]
+    key = api_key or os.environ.get("ILMU_API_KEY")
+    if not key:
+        raise EmbedError("ILMU_API_KEY tak set. Set dalam .env atau env var.")
+
+    body = {
+        "model": model or _DEFAULT_MODEL,
+        "input": text,
+    }
+
+    req = urllib.request.Request(
+        f"{_DEFAULT_URL}/embeddings",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as e:
-        raise EmbedError(f"Embedding timed out after {timeout}s") from e
-    except FileNotFoundError as e:
-        raise EmbedError(f"Binary not found: {config.LLAMA_EMBED}") from e
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="replace")[:300]
+        raise EmbedError(f"HTTP {e.code}: {err}") from e
+    except urllib.error.URLError as e:
+        raise EmbedError(f"Connection failed: {e}") from e
 
-    if result.returncode != 0:
+    try:
+        vec = data["data"][0]["embedding"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise EmbedError(f"Unexpected response: {str(data)[:300]}") from e
+
+    if len(vec) != EXPECTED_DIM:
         raise EmbedError(
-            f"llama-embedding exited with code {result.returncode}\n"
-            f"STDERR: {result.stderr[-300:]}"
+            f"Expected {EXPECTED_DIM} dims, got {len(vec)}. "
+            f"Check model in config."
         )
 
-    vector = _parse_embedding(result.stdout)
-
-    if vector is None:
-        raise EmbedError(
-            f"No embedding found in output.\n"
-            f"STDOUT: {result.stdout[-300:]}"
-        )
-
-    if len(vector) != EXPECTED_DIM:
-        raise EmbedError(
-            f"Expected {EXPECTED_DIM} dims, got {len(vector)}. "
-            f"Check EMBED_MODEL in config.py."
-        )
-
-    return vector
-
-
-def _parse_embedding(stdout: str) -> Optional[List[float]]:
-    """Extract 128-dim vector.
-
-    Model output multi-chunk untuk text panjang. Setiap chunk = 128 dims,
-    disebar multi-line. Flatten semua nombor, then mean-pool kalau lebih 128.
-    """
-    import re
-
-    pattern = r"-?\d+\.\d+(?:[eE][+-]?\d+)?"
-    nums = [float(x) for x in re.findall(pattern, stdout)]
-    if not nums:
-        return None
-
-    arr = np.array(nums, dtype=np.float32)
-
-    # Kalau lebih 128, reshape (n, 128) + mean pool
-    if len(arr) > EXPECTED_DIM:
-        n = len(arr) // EXPECTED_DIM
-        arr = arr[:n * EXPECTED_DIM].reshape(n, EXPECTED_DIM)
-        arr = arr.mean(axis=0)
-
-    return arr.tolist()
+    return vec
 
 
 if __name__ == "__main__":
-    vec = embed("Gen Z Malaysia")
-    print(f"Vector length: {len(vec)}")
-    print(f"First 3 values: {vec[:3]}")
+    from core.env_loader import load_env
+    load_env()
+    v = embed("Gen Z Malaysia")
+    print(f"Dim: {len(v)}")
+    print(f"First 3: {v[:3]}")
