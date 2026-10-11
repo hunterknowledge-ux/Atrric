@@ -89,27 +89,21 @@ def embed(text: str, timeout: int = 120) -> List[float]:
 
    
 def _parse_embedding(stdout: str) -> Optional[List[float]]:
-    """
-    Extract embedding vector from llama-embedding stdout.
-
-    Strategy: scan all lines, find the line (or set of lines)
-    with the most floats. Return that as the vector.
-    """
+    """Extract 128-dim vector. Ambil line dengan paling banyak nombor,
+    tapi reject kalau lebih dari EXPECTED_DIM."""
     import re
     pattern = r"-?\d+\.\d+(?:[eE][+-]?\d+)?"
 
     best: List[float] = []
-
     for line in stdout.splitlines():
         nums = [float(x) for x in re.findall(pattern, line)]
+        # Skip line kalau ada lebih dari EXPECTED_DIM (bukan vector line)
+        if len(nums) > EXPECTED_DIM:
+            continue
         if len(nums) > len(best):
             best = nums
-        elif nums and len(best) < EXPECTED_DIM:
-            # Try accumulating across lines
-            combined = best + nums
-            if len(combined) <= EXPECTED_DIM * 2:
-                best = combined
 
+    # Return only kalau betul-betul 128 (atau closer)
     return best if best else None
     return None
 
