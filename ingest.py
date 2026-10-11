@@ -127,10 +127,14 @@ def main():
         print(f"   → {n} chunks embedded\n")
 
     if d["removed"]:
-        print(f"⚠️  {len(d['removed'])} file dah tiada dalam raw_data/:")
+        print(f"  {len(d['removed'])} file dah tiada dalam raw_data/:")
         for name in d["removed"]:
             print(f"    • {name}")
         print("   (Chunks lama masih dalam store — delete belum diimplementasi)\n")
+
+    # Save store ke disk — KRITIKAL
+    vector_store.save([])
+    print(" Store saved to disk.\n")
 
     manifest["last_run"] = datetime.now().isoformat(timespec="seconds")
     save_manifest(manifest)
