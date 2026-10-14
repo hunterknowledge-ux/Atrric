@@ -44,6 +44,17 @@ def chunk_text(
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
 
+    # Strip header lines (#) and separator lines (---)
+    _lines = []
+    for _l in text.splitlines():
+        _s = _l.strip()
+        if _s.startswith("#"):
+            continue
+        if _s and set(_s) == {"-"} and len(_s) >= 3:
+            continue
+        _lines.append(_l)
+    text = "\n".join(_lines)
+
     # Split by paragraphs first
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
