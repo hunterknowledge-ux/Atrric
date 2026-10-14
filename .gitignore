@@ -283,3 +283,4 @@ __pycache__/
 *.db
 test_graph.db
 raw_data/.manifest.json
+raw_data/yt/
