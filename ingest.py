@@ -44,8 +44,8 @@ def file_hash(path: Path) -> str:
 
 def scan_files() -> dict:
     out = {}
-    for p in sorted(RAW_DIR.glob("*.txt")):
-        out[p.name] = {"path": p, "hash": file_hash(p)}
+    for p in sorted(RAW_DIR.rglob("*.txt")):
+        out[str(p.relative_to(RAW_DIR))] = {"path": p, "hash": file_hash(p)}
     return out
 
 
