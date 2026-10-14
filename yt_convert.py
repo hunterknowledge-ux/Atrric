@@ -2,8 +2,11 @@
 """
 Convert yt-dlp .info.json -> Atrric raw format.
 
+Auto-skips if the video title already exists in output file.
+
 Usage:
   python yt_convert.py <input.json> <output.txt>
+  python yt_convert.py <input.json> <output.txt> --force   # allow duplicate
 """
 
 import json
@@ -49,11 +52,29 @@ def next_post_num(output_path):
     return max((int(m) for m in matches), default=0) + 1
 
 
-def convert(input_path, output_path):
+def already_converted(output_path, title):
+    """Check if OP with this title already exists in output file."""
+    p = Path(output_path)
+    if not p.exists():
+        return False
+    content = p.read_text(encoding='utf-8')
+    cleaned = clean_text(title)
+    # Match 'OP: <title>' pattern
+    return f'OP: {cleaned}' in content
+
+
+def convert(input_path, output_path, force=False):
     with open(input_path, encoding='utf-8') as f:
         data = json.load(f)
 
     title = data.get('title', 'Untitled')
+
+    if not force and already_converted(output_path, title):
+        print(f'SKIP  Already exists in {output_path}')
+        print(f'      Title: {clean_text(title)[:80]}')
+        print(f'      Use --force to override.')
+        return
+
     comments = data.get('comments', [])
 
     kept = [c for c in comments if passes_filter(c)]
@@ -73,15 +94,20 @@ def convert(input_path, output_path):
             lines.append(f"R:R: {clean_text(r.get('text', ''))}")
     lines.extend(["", "---", ""])
 
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'a', encoding='utf-8') as f:
         f.write("\n".join(lines))
 
     n_replies = sum(len(v) for v in replies_by_parent.values())
-    print(f"OK  Post {post_num}: {len(top)} top + {n_replies} replies  ->  {output_path}")
+    print(f"OK    Post {post_num}: {len(top)} top + {n_replies} replies  ->  {output_path}")
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("Usage: python yt_convert.py <input.json> <output.txt>")
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    force = '--force' in sys.argv
+
+    if len(args) < 2:
+        print("Usage: python yt_convert.py <input.json> <output.txt> [--force]")
         sys.exit(1)
-    convert(sys.argv[1], sys.argv[2])
+
+    convert(args[0], args[1], force=force)
