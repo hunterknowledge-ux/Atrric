@@ -284,3 +284,4 @@ __pycache__/
 test_graph.db
 raw_data/.manifest.json
 raw_data/yt/
+raw_data/yt/urls/
