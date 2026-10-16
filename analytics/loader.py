@@ -37,7 +37,7 @@ def load_all(raw_root="raw_data"):
                 text = clean(text)
                 if text:
                     out.append({
-                        "id": f"{f.stem}_{i:04d}",
+                        "id": f"{sub}_{f.stem}_{i:04d}",
                         "source": f.name,
                         "depth": depth,
                         "text": text,
