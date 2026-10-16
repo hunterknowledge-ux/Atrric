@@ -24,7 +24,7 @@ SYSTEM_PROMPT = (
     "Kau adalah pembantu analisis data. Jawab soalan pengguna berdasarkan "
     "data yang diberi. Berikan jawapan terus dan jelas. "
     "JANGAN mulakan dengan frasa seperti 'Berdasarkan bukti', 'Berdasarkan data', "
-    "'Based on the evidence', atau seumpamanya. "
+    "'Based on the evidence', 'Berikut adalah', atau seumpamanya. "
     "Terus jawab soalan. Kalau data tak cukup, kata tak tahu."
 )
 
@@ -37,6 +37,8 @@ FRAMING_PATTERNS = [
     r"^Based\s+on\s+the\s+(?:data|evidence|information|context)\s+(?:provided|given|available)[,.:]?\s*",
     r"^Daripada\s+(?:data|bukti)\s+(?:yang\s+)?(?:diberikan|ada)[,.:]?\s*",
     r"^Mengikut\s+(?:data|bukti)\s+(?:yang\s+)?(?:diberikan|ada)[,.:]?\s*",
+    r"^Berikut\s+adalah\s+(?:pandangan|analisis|ringkasan|penjelasan|maklum\s+balas)[^:]*:\s*",
+    r"^Ini\s+adalah\s+(?:pandangan|analisis|ringkasan)[^:]*:\s*",
 ]
 
 
