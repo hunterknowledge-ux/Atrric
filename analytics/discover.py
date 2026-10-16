@@ -26,7 +26,25 @@ SISPAA, TikTok, Shopee, KPM, Anwar, Malaysia, Gen Z, Millennials
 
 Read the context sentence. If the word is ordinary BM in that context -> "normal".
 
-STRICT JSON only: {"entity":[...], "slang":[...]}"""
+STRICT JSON only: {"entity":["word1","word2"], "slang":["word1","word2"]}
+Return each item as a PLAIN STRING, not an object."""
+
+def _coerce(x):
+    """Force item to string. LLM sometimes returns dicts."""
+    if x is None:
+        return None
+    if isinstance(x, str):
+        s = x.strip()
+        return s or None
+    if isinstance(x, dict):
+        for k in ("word", "name", "text", "value", "entity", "slang"):
+            if k in x:
+                v = x[k]
+                if isinstance(v, str):
+                    return v.strip() or None
+        v = next(iter(x.values()), None)
+        return str(v).strip() if v is not None else None
+    return str(x).strip() or None
 
 def _cand_entities(texts):
     c = Counter()
@@ -59,17 +77,42 @@ def _verify(cands, kind, texts):
     items = [{"word": w, "ctx": ctx_for(w)} for w in cands]
 
     ok = []
-    B = _S["llm_batch"]
+    # batch lebih kecil untuk elak truncation
+    B = min(_S["llm_batch"], 20)
+
+    def _do_batch(chunk, tag=""):
+        try:
+            data = generate_json(json.dumps(chunk, ensure_ascii=False),
+                                 system=VERIFY, max_tokens=4000)
+        except Exception as e:
+            print(f"[discover] {kind} {tag} error: {e}")
+            return []
+        if data is None:
+            return None  # signal fail
+        got = data.get(kind, [])
+        out = []
+        for x in got:
+            s = _coerce(x)
+            if s:
+                out.append(s)
+        return out
+
     for i in range(0, len(items), B):
         chunk = items[i:i+B]
-        data = generate_json(json.dumps(chunk, ensure_ascii=False),
-                             system=VERIFY, max_tokens=3000)
-        if data is None:
-            print(f"[discover] batch {i}: parse fail — skip")
-            continue
-        got = data.get(kind, [])
-        ok.extend(got)
-        print(f"[discover] batch {i}: +{len(got)} {kind}")
+        res = _do_batch(chunk, f"batch {i}")
+        if res is None:
+            # retry dengan batch lebih kecil (separuh)
+            print(f"[discover] {kind} batch {i}: parse fail — retry split")
+            half = max(1, len(chunk) // 2)
+            res = []
+            for j in range(0, len(chunk), half):
+                sub = chunk[j:j+half]
+                r2 = _do_batch(sub, f"batch {i}+{j}")
+                if r2:
+                    res.extend(r2)
+        ok.extend(res)
+        print(f"[discover] {kind} batch {i}: +{len(res)}")
+
     return ok
 
 def run(items):
@@ -89,6 +132,10 @@ def run(items):
     new_e = _verify(e_new, "entity", texts)
     new_s = _verify(s_new, "slang", texts)
 
-    save("entities", sorted(e_ok | set(new_e)))
-    save("slang",    sorted(s_ok | set(new_s)))
-    print(f"[discover] ✅ {len(e_ok|set(new_e))} entities, {len(s_ok|set(new_s))} slang")
+    # defensive: pastikan semua string sebelum gabung
+    clean_e = {x for x in new_e if isinstance(x, str) and x}
+    clean_s = {x for x in new_s if isinstance(x, str) and x}
+
+    save("entities", sorted(e_ok | clean_e))
+    save("slang",    sorted(s_ok | clean_s))
+    print(f"[discover] ✅ {len(e_ok|clean_e)} entities, {len(s_ok|clean_s)} slang")
