@@ -82,7 +82,7 @@ class IlmuLLM:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=timeout or 60) as resp:
+            with urllib.request.urlopen(req, timeout=timeout or 120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             body_err = e.read().decode("utf-8", errors="replace")[:300]
