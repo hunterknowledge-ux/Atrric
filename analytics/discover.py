@@ -46,6 +46,40 @@ def _coerce(x):
         return str(v).strip() if v is not None else None
     return str(x).strip() or None
 
+def _normalize_entities(items):
+    """Merge PTPTN/Ptptn/ptptn -> PTPTN. Prefer uppercase form when available.
+    Multi-word names (e.g. 'Gen Z') keep title case."""
+    seen = {}
+    for x in items:
+        if not isinstance(x, str):
+            continue
+        x = x.strip()
+        if not x:
+            continue
+
+        has_space = " " in x
+        if has_space:
+            # Multi-word: title-case normalize, key = lowercase
+            key = x.lower()
+            canon = x  # keep first-seen casing for multi-word
+        elif x.isupper() and len(x) <= 8:
+            # Short all-caps acronym: keep as-is
+            key = x
+            canon = x
+        else:
+            # Single word mixed-case: uppercase if <= 8 chars, else lowercase
+            if len(x) <= 8:
+                key = x.upper()
+                canon = x.upper()
+            else:
+                key = x.lower()
+                canon = x
+
+        if key not in seen:
+            seen[key] = canon
+
+    return sorted(seen.values())
+
 def _cand_entities(texts):
     c = Counter()
     for t in texts:
@@ -77,7 +111,6 @@ def _verify(cands, kind, texts):
     items = [{"word": w, "ctx": ctx_for(w)} for w in cands]
 
     ok = []
-    # batch lebih kecil untuk elak truncation
     B = min(_S["llm_batch"], 20)
 
     def _do_batch(chunk, tag=""):
@@ -88,7 +121,7 @@ def _verify(cands, kind, texts):
             print(f"[discover] {kind} {tag} error: {e}")
             return []
         if data is None:
-            return None  # signal fail
+            return None
         got = data.get(kind, [])
         out = []
         for x in got:
@@ -101,7 +134,6 @@ def _verify(cands, kind, texts):
         chunk = items[i:i+B]
         res = _do_batch(chunk, f"batch {i}")
         if res is None:
-            # retry dengan batch lebih kecil (separuh)
             print(f"[discover] {kind} batch {i}: parse fail — retry split")
             half = max(1, len(chunk) // 2)
             res = []
@@ -132,10 +164,14 @@ def run(items):
     new_e = _verify(e_new, "entity", texts)
     new_s = _verify(s_new, "slang", texts)
 
-    # defensive: pastikan semua string sebelum gabung
-    clean_e = {x for x in new_e if isinstance(x, str) and x}
-    clean_s = {x for x in new_s if isinstance(x, str) and x}
+    # Coerce to strings
+    raw_e = {x for x in new_e if isinstance(x, str) and x}
+    raw_s = {x for x in new_s if isinstance(x, str) and x}
 
-    save("entities", sorted(e_ok | clean_e))
-    save("slang",    sorted(s_ok | clean_s))
-    print(f"[discover] ✅ {len(e_ok|clean_e)} entities, {len(s_ok|clean_s)} slang")
+    # Merge existing + new, then normalize entities
+    all_e = _normalize_entities(list(e_ok | raw_e))
+    all_s = sorted({x.lower() if not (" " in x) else x for x in (s_ok | raw_s)})
+
+    save("entities", all_e)
+    save("slang", all_s)
+    print(f"[discover] ✅ {len(all_e)} entities, {len(all_s)} slang")
