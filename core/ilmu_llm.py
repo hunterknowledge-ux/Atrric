@@ -1,8 +1,8 @@
 """
 core/ilmu_llm.py — ILMU API LLM adapter.
 
-Interface sama dengan core/llm.py (local) dan EchoLLM:
-    .generate(prompt, *, system="", timeout=None) -> str
+Interface sama dengan core/llm.py dan EchoLLM:
+    .generate(prompt, *, system="", timeout=None, max_tokens=400, temperature=0.3) -> str
 
 Guna urllib (built-in) — zero deps, ARMv7-safe.
 """
@@ -31,7 +31,27 @@ class IlmuLLM:
         self.base_url = (base_url or self.DEFAULT_URL).rstrip("/")
         self.last_usage = {}
 
-    def generate(self, prompt, *, system="", timeout=None, max_tokens=400, temperature=0.3):
+    def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        timeout=None,
+        max_tokens=400,
+        temperature=0.3,
+        prefill="",
+    ):
+        """
+        Generate text via ILMU API.
+
+        Args:
+            prompt: user message
+            system: system prompt (optional)
+            timeout: request timeout seconds
+            max_tokens: max output tokens
+            temperature: sampling temperature (lower = more deterministic)
+            prefill: partial assistant message to start from (skips preamble)
+        """
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -43,6 +63,13 @@ class IlmuLLM:
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
+
+        # Prefill: force assistant to continue from partial message.
+        # Trick: append as assistant message with content.
+        # Some APIs support this via "prefix" or "assistant_prefix".
+        # ILMU = OpenAI-compatible, so use assistant role.
+        if prefill:
+            body["messages"].append({"role": "assistant", "content": prefill})
 
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -65,10 +92,18 @@ class IlmuLLM:
 
         self.last_usage = data.get("usage", {})
         _usage.log_call(self.model, self.last_usage)
+
         choices = data.get("choices", [])
         if not choices:
             raise IlmuError(f"No choices in response: {data}")
-        return choices[0]["message"]["content"]
+
+        content = choices[0]["message"]["content"]
+
+        # Prepend prefill if we forced it (OpenAI returns only continuation)
+        if prefill and not content.startswith(prefill):
+            content = prefill + content
+
+        return content
 
     def cost_estimate(self):
         """Return (input_rm, output_rm) for last call."""
