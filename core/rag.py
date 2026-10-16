@@ -3,6 +3,8 @@ core/rag.py — RAG wrapper untuk ATRRIC.
 
 Satu-satunya tempat yang tahu tentang OmniFuse.
 Bila nak swap engine lain (ship time), tukar file ni sahaja.
+
+v2: Auto-load ontology graph kalau ada.
 """
 
 from omnifuse import OmniFuse, EchoLLM, InMemoryGraph
@@ -21,18 +23,37 @@ class RAG:
     def __init__(self, graph=None, llm=None):
         # vector: adapter sedia ada (dah works)
         self._vs = PocketVectorStore()
-        # graph: InMemoryGraph default (boleh swap bila ada ontology)
-        self._graph = graph if graph is not None else InMemoryGraph(
-            nodes=[], triples=[]
-        )
-        # llm: default EchoLLM (no-op), plug Gemini/local bila ready
+
+        # graph: load ontology kalau ada, fallback ke empty
+        if graph is not None:
+            self._graph = graph
+        else:
+            self._graph = self._load_ontology_graph()
+
+        # llm: default EchoLLM (no-op), plug ILMU bila ready
         self._llm = llm if llm is not None else EchoLLM()
+
         # engine: satu-satunya OmniFuse instance
+        # graph_fusion=True default → auto guna graph
         self._engine = OmniFuse(
             graph=self._graph,
             vector=self._vs,
             llm=self._llm,
         )
+
+    def _load_ontology_graph(self):
+        """Load ontology_graph.json → InMemoryGraph. Fallback ke empty."""
+        try:
+            from core.ontology_to_omnifuse import get_ontology_graph
+            graph = get_ontology_graph()
+            print(f"[RAG] Ontology loaded: {len(graph._nodes)} nodes")
+            return graph
+        except FileNotFoundError:
+            print("[RAG] No ontology graph — empty graph")
+            return InMemoryGraph(nodes=[], triples=[])
+        except Exception as e:
+            print(f"[RAG] Ontology load fail: {e} — empty graph")
+            return InMemoryGraph(nodes=[], triples=[])
 
     # --- public API ---
 
@@ -52,6 +73,7 @@ class RAG:
             self._engine.close()
         except Exception:
             pass
+
 
 # ─────────────────────────────────────────────────
 # Contract untuk frontend
@@ -98,5 +120,5 @@ def answer_question(q: str, top_k: int = 3) -> dict:
 
     return {
         "answer": getattr(result, "answer", "") or "",
-        "sources": sources,  # filename je — ["pendidikan.txt"]
+        "sources": sources,
     }
