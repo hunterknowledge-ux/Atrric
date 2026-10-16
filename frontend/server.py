@@ -1,45 +1,243 @@
-import json
-import os
-import sys
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Atrric</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  html, body { height: 100%; }
+  body { height: 100vh; height: 100dvh; overflow: hidden; }
 
-# Tambah parent dir ke sys.path supaya `from core.rag import ...` jalan
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+  .fade-in { animation: fadeIn .3s ease-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
-from core.rag import answer_question
+  .dots span {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #71717a; margin-right: 4px;
+    animation: bounce 1.2s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: .15s; }
+  .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+    30%           { transform: translateY(-4px); opacity: 1; }
+  }
 
-PORT = 8000
+  main::-webkit-scrollbar { width: 4px; }
+  main::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
 
+  /* markdown prose */
+  .md { line-height: 1.6; }
+  .md > *:first-child { margin-top: 0; }
+  .md > *:last-child  { margin-bottom: 0; }
+  .md p   { margin: 0 0 .75em; }
+  .md strong { color: #fafafa; font-weight: 600; }
+  .md em  { color: #e4e4e7; }
+  .md ul, .md ol { margin: 0 0 .75em; padding-left: 1.25em; }
+  .md ul { list-style: disc; }
+  .md ol { list-style: decimal; }
+  .md li { margin: .15em 0; }
+  .md li > p { margin: 0; }
+  .md h1, .md h2, .md h3, .md h4 { font-weight: 600; color: #fafafa; margin: 1em 0 .5em; line-height: 1.3; }
+  .md h1 { font-size: 1.15em; }
+  .md h2 { font-size: 1.08em; }
+  .md h3 { font-size: 1em; }
+  .md code {
+    background: #27272a; color: #fafafa;
+    padding: .1em .35em; border-radius: 4px;
+    font-size: .85em; font-family: ui-monospace, "Courier New", monospace;
+  }
+  .md pre {
+    background: #18181b; border: 1px solid #27272a;
+    padding: .75em; border-radius: 8px;
+    overflow-x: auto; margin: 0 0 .75em;
+    font-size: .82em;
+  }
+  .md pre code { background: transparent; padding: 0; font-size: 1em; }
+  .md a { color: #a1a1aa; text-decoration: underline; text-underline-offset: 2px; }
+  .md a:hover { color: #fafafa; }
+  .md blockquote {
+    border-left: 2px solid #3f3f46; padding-left: .75em;
+    color: #a1a1aa; margin: 0 0 .75em;
+  }
+  .md hr { border: 0; border-top: 1px solid #27272a; margin: 1em 0; }
+</style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 flex flex-col">
 
-class Handler(SimpleHTTPRequestHandler):
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path == "/api/query":
-            q = parse_qs(parsed.query).get("q", [""])[0].strip()
-            if not q:
-                data = {"error": "empty query", "answer": "", "sources": []}
-            else:
-                try:
-                    data = answer_question(q)
-                except Exception as e:
-                    data = {"error": str(e), "answer": "", "sources": []}
-            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            super().do_GET()
+  <!-- HEADER -->
+  <header class="shrink-0 border-b border-zinc-800 px-4 py-3 flex items-center gap-2 bg-zinc-950 z-10">
+    <span class="font-semibold tracking-tight">Atrric</span>
+    <span class="text-[10px] uppercase tracking-wider bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">beta</span>
+  </header>
 
-    def log_message(self, fmt, *args):
-        pass  # senyapkan log request
+  <!-- MAIN -->
+  <main id="main" class="flex-1 overflow-y-auto px-4 py-6">
 
+    <!-- HERO -->
+    <section id="hero" class="max-w-2xl mx-auto">
+      <h1 class="text-xl font-semibold text-center mt-6 mb-6">Apa yang anda ingin tahu?</h1>
+      <div class="space-y-2">
+        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Apa trend skincare Gen Z Malaysia 2026?</button>
+        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Brand lokal apa viral di TikTok Malaysia?</button>
+        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Kenapa Gen Z Malaysia suka beli online?</button>
+      </div>
+    </section>
 
-if __name__ == "__main__":
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    print(f"[Atrric] http://localhost:{PORT}")
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    <!-- THREAD -->
+    <section id="thread" class="max-w-2xl mx-auto space-y-4 hidden"></section>
+
+  </main>
+
+  <!-- INPUT -->
+  <footer class="shrink-0 border-t border-zinc-800 p-3 bg-zinc-950">
+    <form id="form" class="max-w-2xl mx-auto flex gap-2 items-end">
+      <textarea id="input" rows="1" placeholder="Taip soalan..."
+        class="flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 max-h-32"></textarea>
+      <button type="submit" id="send"
+        class="shrink-0 bg-zinc-100 text-zinc-900 rounded-xl px-4 py-2 text-sm font-medium hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+        Hantar
+      </button>
+    </form>
+  </footer>
+
+<script>
+(function () {
+  const $form   = document.getElementById('form');
+  const $input  = document.getElementById('input');
+  const $send   = document.getElementById('send');
+  const $main   = document.getElementById('main');
+  const $hero   = document.getElementById('hero');
+  const $thread = document.getElementById('thread');
+
+  let loading = false;
+
+  // --- helpers ---
+  const esc = s => String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  const scrollBottom = () => { $main.scrollTop = $main.scrollHeight; };
+
+  const hideHero = () => {
+    if (!$hero.classList.contains('hidden')) {
+      $hero.classList.add('hidden');
+      $thread.classList.remove('hidden');
+    }
+  };
+
+  // markdown -> safe html
+  marked.setOptions({ breaks: true, gfm: true });
+  function renderMD(text) {
+    const raw = marked.parse(String(text || ''));
+    return DOMPurify.sanitize(raw);
+  }
+
+  // --- render bubbles ---
+  function addUser(text) {
+    const el = document.createElement('div');
+    el.className = 'flex justify-end fade-in';
+    el.innerHTML = `<div class="bg-zinc-800 rounded-2xl rounded-br-md px-4 py-2 max-w-[85%] text-sm whitespace-pre-wrap break-words">${esc(text)}</div>`;
+    $thread.appendChild(el);
+  }
+
+  function addAI(text, sources, error) {
+    const el = document.createElement('div');
+    el.className = 'flex justify-start fade-in';
+
+    let html = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] text-sm min-w-0">`;
+    if (error) {
+      html += `<div class="text-red-400 text-xs mb-2 break-words">⚠ ${esc(error)}</div>`;
+    }
+    if (text) {
+      html += `<div class="md break-words">${renderMD(text)}</div>`;
+    } else {
+      html += `<div class="text-zinc-500">(tiada jawapan)</div>`;
+    }
+    if (sources && sources.length) {
+      html += `<div class="flex flex-wrap gap-1.5 mt-3">`;
+      for (const s of sources) {
+        html += `<span class="text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">${esc(s)}</span>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+    el.innerHTML = html;
+    $thread.appendChild(el);
+  }
+
+  function addLoading() {
+    const el = document.createElement('div');
+    el.id = 'loading';
+    el.className = 'flex justify-start fade-in';
+    el.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl rounded-bl-md px-4 py-3"><div class="dots"><span></span><span></span><span></span></div></div>`;
+    $thread.appendChild(el);
+  }
+
+  const removeLoading = () => document.getElementById('loading')?.remove();
+
+  // --- submit ---
+  async function submit(q) {
+    q = q.trim();
+    if (!q || loading) return;
+
+    loading = true;
+    $send.disabled = true;
+    $input.value = '';
+    $input.style.height = 'auto';
+
+    hideHero();
+    addUser(q);
+    addLoading();
+    scrollBottom();
+
+    try {
+      const res  = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      removeLoading();
+      addAI(data.answer, data.sources, data.error);
+    } catch (e) {
+      removeLoading();
+      addAI('', [], 'Network error: ' + e.message);
+    } finally {
+      loading = false;
+      $send.disabled = false;
+      scrollBottom();
+      $input.focus();
+    }
+  }
+
+  // --- events ---
+  $form.addEventListener('submit', e => {
+    e.preventDefault();
+    submit($input.value);
+  });
+
+  $input.addEventListener('input', () => {
+    $input.style.height = 'auto';
+    $input.style.height = Math.min($input.scrollHeight, 128) + 'px';
+  });
+
+  $input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      $form.requestSubmit();
+    }
+  });
+
+  document.querySelectorAll('.example').forEach(btn => {
+    btn.addEventListener('click', () => submit(btn.textContent));
+  });
+})();
+</script>
+</body>
+</html>
