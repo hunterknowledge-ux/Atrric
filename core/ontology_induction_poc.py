@@ -28,14 +28,14 @@ from core.store import _get_db
 
 
 # ══════════════════════════════════════════════════════════
-# STEP 1 — EXTRACT ATTRIBUTES (unconstrained)
+# STEP 1 — EXTRACT ATTRIBUTES (unconstrained, per chunk)
 # ══════════════════════════════════════════════════════════
 
-EXTRACT_PROMPT = """Extract implicit attributes from these Malaysian social media comments.
+EXTRACT_PROMPT = """Extract implicit attributes from this Malaysian social media comment.
 
 DO NOT use a fixed schema. Discover whatever attributes are actually present.
 
-For each chunk, output a JSON list of objects:
+Output a JSON list of objects:
 [{{"attribute": "...", "value": "..."}}, ...]
 
 Rules:
@@ -44,36 +44,35 @@ Rules:
 - Skip short/empty chunks (haha, thanks, emoji only)
 - No explanation. Output JSON only.
 
-Chunks:
-{chunks}
+Comment:
+{chunk}
 
 Output:"""
 
 
 def extract_attributes(llm, chunks):
-    chunks_text = "\n\n".join(
-        f"[CHUNK {i}]\n{c[:500]}"
-        for i, c in enumerate(chunks)
-    )
-    prompt = EXTRACT_PROMPT.format(chunks=chunks_text)
+    """Extract per chunk — elak JSON cutoff."""
+    all_attrs = []
+    for i, chunk in enumerate(chunks):
+        prompt = EXTRACT_PROMPT.format(chunk=chunk[:500])
+        raw = llm.generate(prompt, max_tokens=800, temperature=0.3)
 
-    raw = llm.generate(prompt, max_tokens=2000, temperature=0.3)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
 
-    # Parse JSON
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = re.sub(r"^```(?:json)?\n?", "", raw)
-        raw = re.sub(r"\n?```$", "", raw)
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                data = data.get("attributes", data.get("data", []))
+            if isinstance(data, list):
+                all_attrs.extend(data)
+        except json.JSONDecodeError as e:
+            print(f"  [!] Chunk {i} JSON fail: {e}")
+            print(f"      Raw (first 200): {raw[:200]}")
 
-    try:
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            data = data.get("attributes", data.get("data", []))
-        return data if isinstance(data, list) else []
-    except json.JSONDecodeError as e:
-        print(f"  [!] JSON parse fail: {e}")
-        print(f"  Raw (first 300): {raw[:300]}")
-        return []
+    return all_attrs
 
 
 # ══════════════════════════════════════════════════════════
@@ -168,7 +167,7 @@ def main():
     for iteration in range(1, 4):
         print(f"--- Iteration {iteration} ---")
 
-        # Extract
+        # Extract (per chunk)
         attrs = extract_attributes(llm, chunks)
         print(f"  Extracted: {len(attrs)} attribute-value pairs")
 
