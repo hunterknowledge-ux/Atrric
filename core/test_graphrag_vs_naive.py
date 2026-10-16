@@ -1,10 +1,11 @@
 """
 core/test_graphrag_vs_naive.py
 
-Compare GraphRAG (dengan graph) vs Naive RAG (empty graph).
+Compare Naive RAG vs GraphRAG — full answer, metrics, side-by-side.
 """
 
 import sys
+import time
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
@@ -20,61 +21,67 @@ from core.ilmu_llm import IlmuLLM
 
 
 QUERIES = [
-    "Apa isu pendidikan sekarang?",
     "Kenapa Gen Z dikatakan lemah?",
-    "Apa peranan cikgu dalam isu pendidikan?",
+    "Apa isu pendidikan sekarang?",
     "Bagaimana Millennials dilihat oleh Gen Z?",
-    "Apa SISPAA dan kenapa ia disebut?",
 ]
 
 
-def run_query(rag, q):
-    r = rag.search(q, synthesize=True)
-    return {
-        "answer": r.answer or "",
-        "chunks": len(r.chunks or []),
-        "evidence": len(r.evidence or []),
-        "relations": len(r.relations or []),
-    }
+def run(rag, q):
+    t0 = time.time()
+    try:
+        r = rag.search(q, synthesize=True)
+        return {
+            "ok": True,
+            "answer": r.answer or "",
+            "chunks": len(r.chunks or []),
+            "evidence": len(r.evidence or []),
+            "relations": len(r.relations or []),
+            "elapsed": round(time.time() - t0, 1),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e), "elapsed": round(time.time() - t0, 1)}
 
 
 def main():
-    print("=== GRAPHRAG vs NAIVE RAG ===\n")
+    print("=" * 75)
+    print("NAIVE RAG (vector-only)  vs  GRAPHRAG (vector + ontology)")
+    print("=" * 75)
 
     llm = IlmuLLM()
 
-    # GraphRAG — dengan graph
-    print("Loading GraphRAG (with ontology)...")
+    print("\nLoading RAG engines...")
     rag_graph = RAG(llm=llm)
-
-    # Naive — empty graph
-    print("Loading Naive RAG (empty graph)...")
     rag_naive = RAG(graph=InMemoryGraph(nodes=[], triples=[]), llm=llm)
 
-    print()
-    print("=" * 70)
-
     for i, q in enumerate(QUERIES, 1):
-        print(f"\n### QUERY {i}: {q}\n")
+        print(f"\n{'#' * 75}")
+        print(f"QUERY {i}: {q}")
+        print(f"{'#' * 75}")
 
-        # Naive
-        print("[NAIVE RAG]")
-        n = run_query(rag_naive, q)
-        print(f"  chunks: {n['chunks']} | evidence: {n['evidence']} | relations: {n['relations']}")
-        print(f"  answer: {n['answer'][:200]}...")
+        # NAIVE
+        print("\n--- NAIVE RAG ---")
+        n = run(rag_naive, q)
+        if n["ok"]:
+            print(f"chunks: {n['chunks']}  |  relations: {n['relations']}  |  time: {n['elapsed']}s")
+            print(f"\n{n['answer']}")
+        else:
+            print(f"ERROR: {n['error']}")
 
         print()
 
-        # GraphRAG
-        print("[GRAPHRAG]")
-        g = run_query(rag_graph, q)
-        print(f"  chunks: {g['chunks']} | evidence: {g['evidence']} | relations: {g['relations']}")
-        print(f"  answer: {g['answer'][:200]}...")
-
-        print("-" * 70)
+        # GRAPHRAG
+        print("--- GRAPHRAG ---")
+        g = run(rag_graph, q)
+        if g["ok"]:
+            print(f"chunks: {g['chunks']}  |  relations: {g['relations']}  |  time: {g['elapsed']}s")
+            print(f"\n{g['answer']}")
+        else:
+            print(f"ERROR: {g['error']}")
 
     rag_graph.close()
     rag_naive.close()
+    print(f"\n{'=' * 75}\nDONE")
 
 
 if __name__ == "__main__":
