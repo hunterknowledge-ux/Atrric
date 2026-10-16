@@ -2,7 +2,7 @@
 core/ilmu_llm.py — ILMU API LLM adapter.
 
 Interface sama dengan core/llm.py dan EchoLLM:
-    .generate(prompt, *, system="", timeout=None, max_tokens=400, temperature=0.3) -> str
+    .generate(prompt, *, system="", timeout=None, max_tokens=1500, temperature=0.3) -> str
 
 Guna urllib (built-in) — zero deps, ARMv7-safe.
 """
