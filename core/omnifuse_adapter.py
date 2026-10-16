@@ -9,8 +9,10 @@ from omnifuse.models import Chunk, ChunkMutationResult
 
 from core import embed as core_embed
 from core import store as core_store
+import config
 
-_DIM = 128
+# Auto-detect dari config — elak mismatch bila tukar embedder
+_DIM = config.EMBED_DIM
 
 
 class PocketVectorStore:
