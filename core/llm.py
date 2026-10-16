@@ -73,3 +73,23 @@ def generate_json(prompt, system="", max_tokens=None, **kw):
         return _json.loads(s)
     except _json.JSONDecodeError:
         return None
+# ── JSON helper (Analytics Layer) ─────────────────────────────
+import json as _json
+import re as _re
+
+_FENCE = _re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", _re.M)
+
+def generate_json(prompt, system="", max_tokens=None, **kw):
+    """generate() + strip markdown fence + parse JSON."""
+    raw = generate(prompt, system=system, max_tokens=max_tokens, **kw)
+    if not raw:
+        return None
+    s = _FENCE.sub("", raw).strip()
+    if not s.startswith("{"):
+        i, j = s.find("{"), s.rfind("}")
+        if i >= 0 and j > i:
+            s = s[i:j+1]
+    try:
+        return _json.loads(s)
+    except _json.JSONDecodeError:
+        return None
