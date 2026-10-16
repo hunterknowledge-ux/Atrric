@@ -1,7 +1,7 @@
 {
   "min_count_entity": 3,
   "min_count_slang": 5,
-  "min_word_length": 3,
+  "min_word_length": 4,
   "llm_batch": 40,
   "max_text_chars": 800,
   "top_n": 20
