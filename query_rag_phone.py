@@ -78,7 +78,8 @@ def _strip_framing(text: str) -> str:
     if not text:
         return text
     s = text.lstrip()
-    # Loop: strip multiple layers if stacked
+
+    # Loop: strip multiple framing layers if stacked
     for _ in range(3):
         before = s
         for pat in FRAMING_PATTERNS:
@@ -88,6 +89,10 @@ def _strip_framing(text: str) -> str:
                 break
         if s == before:
             break
+
+    # Normalize headings with dash prefix: "### - **X**" -> "### **X**"
+    s = re.sub(r"^(#{1,6})\s*[-•]\s*", r"\1 ", s, flags=re.MULTILINE)
+
     return s.strip()
 
 
