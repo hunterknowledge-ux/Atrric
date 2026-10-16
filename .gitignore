@@ -310,3 +310,4 @@ ontology_extract_progress.jsonl
 __pycache__/
 .env
 analytics/discovered/
+analytics/discovered/
