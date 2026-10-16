@@ -2,7 +2,7 @@
 core/ontology_extract.py
 
 Extract values dari chunks guna schema yang discovered.
-Output: nodes + edges untuk OmniFuse InMemoryGraph.
+v2: Better prompt — skip if unsure, explicit rules untuk age/role.
 """
 
 import json
@@ -26,6 +26,7 @@ SCHEMA_FILE = _ROOT / "core" / "ontology_schema.json"
 OUTPUT_FILE = _ROOT / "ontology_graph.json"
 MAX_RETRIES = 3
 DELAY = 0.5
+TEST_SIZE = 20
 
 
 def load_schema():
@@ -39,10 +40,19 @@ ATTRIBUTES: {attributes}
 Output a JSON list:
 [{{"attribute": "...", "value": "..."}}, ...]
 
-Rules:
+RULES:
 - Only use attributes from the list above
-- Value: short, 1-5 words
-- Skip attribute if not clearly present
+- ONLY extract if value is CLEARLY stated in text
+- If not clearly stated, SKIP that attribute — DON'T guess
+- age = number range (e.g. "20s", "18-25"), NOT generation name
+- role = author role (e.g. "op", "replier"), NOT username
+- generation = generation name (Gen Z, Millennials, Alpha)
+- topic = subject being discussed (1-3 words)
+- emotion = emotional tone (frustrated, angry, sad, etc)
+- stance = position taken (agree, disagree, critical, etc)
+- target_group = who is being discussed (parents, teachers, etc)
+- tone = communication style (sarcastic, formal, casual, etc)
+- value: short, 1-5 words, lowercase
 - No explanation. JSON only.
 
 Comment:
@@ -79,73 +89,80 @@ def extract_chunk(llm, chunk, attributes, chunk_id):
     raw = _safe_generate(llm, prompt, chunk_id)
     if raw is None:
         return []
-    
+
     raw = _strip_fence(raw)
     try:
         data = json.loads(raw)
         if isinstance(data, list):
-            return data
+            # Validate — buang value nonsense
+            clean = []
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                attr = str(item.get("attribute", "")).strip().lower()
+                val = str(item.get("value", "")).strip().lower()
+                if not attr or not val or len(val) > 50:
+                    continue
+                # Filter: age tak boleh jadi "gen z"
+                if attr == "age" and any(
+                    g in val for g in ["gen", "millennial", "alpha", "boomer"]
+                ):
+                    continue
+                # Filter: role tak boleh jadi username
+                if attr == "role" and val.startswith("@"):
+                    continue
+                clean.append({"attribute": attr, "value": val})
+            return clean
     except json.JSONDecodeError:
         pass
     return []
 
 
 def build_graph(results):
-    """Convert extraction results → nodes + edges."""
-    nodes = {}   # id -> {label, kind}
-    edges = []   # {subject, predicate, object}
-    
+    nodes = {}
+    edges = []
+
     for item in results:
         chunk_id = item["chunk_id"]
-        source = item["source"]
-        
-        # Chunk node
         chunk_node_id = f"chunk_{chunk_id}"
         nodes[chunk_node_id] = {
             "id": chunk_node_id,
-            "label": f"Chunk {chunk_id}",
+            "label": f"Chunk {chunk_id[:8]}",
             "kind": "chunk",
         }
-        
+
         for attr_pair in item["attributes"]:
-            attr = attr_pair.get("attribute", "").strip().lower()
-            val = str(attr_pair.get("value", "")).strip().lower()
-            if not attr or not val or len(val) > 50:
-                continue
-            
-            # Value node
+            attr = attr_pair["attribute"]
+            val = attr_pair["value"]
+
             val_node_id = f"{attr}:{val}"
             nodes[val_node_id] = {
                 "id": val_node_id,
                 "label": val,
                 "kind": attr,
             }
-            
-            # Chunk → Value edge
+
             edges.append({
                 "subject": chunk_node_id,
                 "predicate": f"has_{attr}",
                 "object": val_node_id,
             })
-    
+
     return list(nodes.values()), edges
 
 
 def main():
-    print("=== ONTOLOGY EXTRACTION ===\n")
-    
+    print("=== ONTOLOGY EXTRACTION v2 ===\n")
+
     schema = load_schema()
     attributes = schema["attributes"]
     print(f"Schema: {attributes}\n")
-    
-    # Test 20 chunk dulu
-    TEST_SIZE = 20
-    
+
     db = _get_db()
     with open(db.metadata_file) as f:
         meta = json.load(f)
     docs = meta.get("documents", {})
-    
+
     chunks = []
     for chunk_id, doc in list(docs.items())[:TEST_SIZE]:
         text = doc.get("text", "").strip()
@@ -155,15 +172,17 @@ def main():
                 "text": text,
                 "source": doc.get("metadata", {}).get("source", "unknown"),
             })
-    
+
     print(f"Extracting from {len(chunks)} chunks (test)...\n")
-    
+
     llm = IlmuLLM()
     results = []
-    
+    total_attrs = 0
+
     for i, c in enumerate(chunks, 1):
         print(f"  [{i}/{len(chunks)}] {c['source']}...", end=" ", flush=True)
         attrs = extract_chunk(llm, c["text"], attributes, c["chunk_id"])
+        total_attrs += len(attrs)
         results.append({
             "chunk_id": c["chunk_id"],
             "source": c["source"],
@@ -171,15 +190,26 @@ def main():
         })
         print(f"{len(attrs)} attrs")
         time.sleep(DELAY)
-    
-    # Build graph
+
     nodes, edges = build_graph(results)
-    
+
     print(f"\n=== RESULT ===")
+    print(f"Chunks processed: {len(chunks)}")
+    print(f"Total attributes: {total_attrs}")
+    print(f"Avg attrs/chunk:  {total_attrs / len(chunks):.1f}")
     print(f"Nodes: {len(nodes)}")
     print(f"Edges: {len(edges)}")
-    
-    # Save
+
+    # Attribute distribution
+    from collections import Counter
+    attr_dist = Counter()
+    for item in results:
+        for a in item["attributes"]:
+            attr_dist[a["attribute"]] += 1
+    print(f"\n=== ATTRIBUTE DISTRIBUTION ===")
+    for attr, count in attr_dist.most_common():
+        print(f"  {attr}: {count}")
+
     output = {
         "schema": attributes,
         "chunks_processed": len(chunks),
@@ -189,14 +219,10 @@ def main():
     }
     OUTPUT_FILE.write_text(json.dumps(output, indent=2, ensure_ascii=False))
     print(f"\nSaved: {OUTPUT_FILE.name}")
-    
-    # Sample
+
     print(f"\n=== SAMPLE NODES ===")
-    for n in nodes[:5]:
+    for n in nodes[:8]:
         print(f"  {n['id']} ({n['kind']})")
-    print(f"\n=== SAMPLE EDGES ===")
-    for e in edges[:5]:
-        print(f"  {e['subject']} → {e['predicate']} → {e['object']}")
 
 
 if __name__ == "__main__":
