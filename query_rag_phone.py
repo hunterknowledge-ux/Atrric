@@ -2,10 +2,12 @@
 query_rag_phone.py - Query the RAG index (phone mode).
 
 Takes a user question, embeds it, searches the vector store,
-builds an OpenAI-compatible prompt, and calls ILMU API.
+builds an OpenAI-compatible prompt, calls ILMU API,
+and strips common "Berdasarkan..." framing from output.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +27,33 @@ SYSTEM_PROMPT = (
     "'Based on the evidence', atau seumpamanya. "
     "Terus jawab soalan. Kalau data tak cukup, kata tak tahu."
 )
+
+
+# Framing patterns to strip from LLM output (post-process)
+FRAMING_PATTERNS = [
+    r"^Berdasarkan\s+(?:data|bukti|maklumat|informasi)\s+(?:yang\s+)?(?:diberikan|ada|tersedia)[,.:]?\s*",
+    r"^Berdasarkan\s+perbincangan\s+dalam\s+(?:data|bukti)[,.:]?\s*",
+    r"^Berdasarkan\s+kepada\s+(?:data|bukti)[,.:]?\s*",
+    r"^Based\s+on\s+the\s+(?:data|evidence|information|context)\s+(?:provided|given|available)[,.:]?\s*",
+    r"^Daripada\s+(?:data|bukti)\s+(?:yang\s+)?(?:diberikan|ada)[,.:]?\s*",
+    r"^Mengikut\s+(?:data|bukti)\s+(?:yang\s+)?(?:diberikan|ada)[,.:]?\s*",
+]
+
+
+def _strip_framing(text: str) -> str:
+    """Strip common 'Berdasarkan...' framing from model output."""
+    if not text:
+        return text
+    s = text.lstrip()
+    for pat in FRAMING_PATTERNS:
+        new_s = re.sub(pat, "", s, count=1, flags=re.IGNORECASE)
+        if new_s != s:
+            s = new_s
+            break
+    # Capitalize first letter if lowercase
+    if s and s[0].islower():
+        s = s[0].upper() + s[1:]
+    return s
 
 
 def query(question: str, top_k: int = None) -> None:
@@ -77,6 +106,9 @@ def query(question: str, top_k: int = None) -> None:
     except LLMError as e:
         print(f"LLM failed: {e}")
         sys.exit(1)
+
+    # Post-process: strip framing from output
+    answer = _strip_framing(answer)
 
     print()
     print("=== ANSWER ===")
