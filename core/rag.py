@@ -46,7 +46,7 @@ class RAG:
         try:
             from core.ontology_to_omnifuse import get_ontology_graph
             graph = get_ontology_graph()
-            print(f"[RAG] Ontology loaded: {len(graph._nodes)} nodes")
+            print("[RAG] Ontology loaded")
             return graph
         except FileNotFoundError:
             print("[RAG] No ontology graph — empty graph")
