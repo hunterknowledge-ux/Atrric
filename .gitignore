@@ -285,3 +285,28 @@ test_graph.db
 raw_data/.manifest.json
 raw_data/yt/
 raw_data/yt/urls/
+
+# ATRRIC outputs (regenerable)
+analytics_out/
+analytics/discovered/__pycache__/
+logs/
+
+# Ontology runtime
+ontology_graph.json
+ontology_progress.json
+ontology_extract_progress.jsonl
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Env
+.env
+
+analytics_out/
+ontology_graph.json
+ontology_progress.json
+ontology_extract_progress.jsonl
+__pycache__/
+.env
+analytics/discovered/
