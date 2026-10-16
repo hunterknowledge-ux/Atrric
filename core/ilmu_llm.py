@@ -21,7 +21,7 @@ class IlmuError(Exception):
 
 class IlmuLLM:
     DEFAULT_URL = "https://api.ilmu.ai/v1"
-    DEFAULT_MODEL = "ilmu-glm-5.3-flash"
+    DEFAULT_MODEL = "ilmu-mini-v3.3"
 
     def __init__(self, model=None, api_key=None, base_url=None):
         self.model = model or self.DEFAULT_MODEL
