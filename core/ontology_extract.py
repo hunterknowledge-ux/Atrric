@@ -2,7 +2,7 @@
 core/ontology_extract.py
 
 Extract values dari chunks guna schema yang discovered.
-v2: Better prompt — skip if unsure, explicit rules untuk age/role.
+v3: Prompt explicit "don't force fill" + post-process filter.
 """
 
 import json
@@ -10,6 +10,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from collections import Counter
 
 _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
@@ -28,37 +29,46 @@ MAX_RETRIES = 3
 DELAY = 0.5
 TEST_SIZE = 20
 
+# Post-process filters
+BLACKLIST_VALUES = {"not stated", "unknown", "n/a", "none", "null", "", "-"}
+BLACKLIST_ATTRS = {"attribute", "value", "type", "key"}
+
 
 def load_schema():
     return json.loads(SCHEMA_FILE.read_text())
 
 
-EXTRACT_PROMPT = """Extract values for these attributes from the comment.
+EXTRACT_PROMPT = """Analyze this Malaysian social media comment and extract ONLY the attributes that are CLEARLY present.
 
-ATTRIBUTES: {attributes}
+AVAILABLE ATTRIBUTES: {attributes}
 
-Output a JSON list:
+Output format (JSON list):
 [{{"attribute": "...", "value": "..."}}, ...]
 
-RULES:
-- Only use attributes from the list above
-- ONLY extract if value is CLEARLY stated in text
-- If not clearly stated, SKIP that attribute — DON'T guess
-- age = number range (e.g. "20s", "18-25"), NOT generation name
-- role = author role (e.g. "op", "replier"), NOT username
-- generation = generation name (Gen Z, Millennials, Alpha)
-- topic = subject being discussed (1-3 words)
-- emotion = emotional tone (frustrated, angry, sad, etc)
-- stance = position taken (agree, disagree, critical, etc)
-- target_group = who is being discussed (parents, teachers, etc)
-- tone = communication style (sarcastic, formal, casual, etc)
-- value: short, 1-5 words, lowercase
-- No explanation. JSON only.
+CRITICAL RULES:
+1. If a comment discusses only 2-3 things, output ONLY 2-3 attributes
+2. DO NOT force all 8 attributes — better fewer & accurate than many & wrong
+3. If comment is short/joke like "haha", "thanks", output []
+4. If attribute is not clearly stated, SKIP it — DON'T guess
+
+ATTRIBUTE DEFINITIONS:
+- age: number range (e.g. "20s", "18-25", "13yo") — NOT generation name
+- emotion: emotional tone (frustrated, angry, sad, happy, sarcastic)
+- generation: generation name only (Gen Z, Millennials, Gen Alpha, Boomer)
+- role: author role (op, replier, commenter) — NOT username
+- stance: position (agree, disagree, critical, support, neutral)
+- target_group: who is discussed (parents, teachers, government, students)
+- tone: communication style (sarcastic, formal, casual, emotional)
+- topic: subject (education, economy, politics, social_media)
+
+Example input: "OP: Gen Z lemah, macam strawberi"
+Example output: [{{"attribute": "topic", "value": "education"}}, {{"attribute": "target_group", "value": "gen z"}}, {{"attribute": "stance", "value": "critical"}}]
+(Only 3 attrs — not 8)
 
 Comment:
 {chunk}
 
-Output:"""
+Output (JSON only):"""
 
 
 def _safe_generate(llm, prompt, chunk_id):
@@ -81,6 +91,63 @@ def _strip_fence(raw):
     return raw
 
 
+def _clean_attributes(data, valid_attrs):
+    """Post-process: buang nonsense, dedup, validate."""
+    if not isinstance(data, list):
+        return []
+
+    clean = []
+    seen = set()
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+
+        attr = str(item.get("attribute", "")).strip().lower()
+        val = str(item.get("value", "")).strip().lower()
+
+        # Validate basic
+        if not attr or not val:
+            continue
+        if len(val) > 50 or len(attr) > 30:
+            continue
+
+        # Filter blacklist
+        if attr in BLACKLIST_ATTRS:
+            continue
+        if val in BLACKLIST_VALUES:
+            continue
+
+        # Validate attribute ada dalam schema
+        if attr not in valid_attrs:
+            continue
+
+        # Filter: age tak boleh jadi "gen z"
+        if attr == "age":
+            if any(g in val for g in ["gen", "millennial", "alpha", "boomer"]):
+                continue
+
+        # Filter: role tak boleh jadi username
+        if attr == "role" and val.startswith("@"):
+            continue
+
+        # Filter: generation mesti explicit
+        if attr == "generation":
+            valid_gens = ["gen z", "gen alpha", "millennial", "boomer", "gen x"]
+            if not any(g in val for g in valid_gens):
+                continue
+
+        # Dedup
+        key = (attr, val)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        clean.append({"attribute": attr, "value": val})
+
+    return clean
+
+
 def extract_chunk(llm, chunk, attributes, chunk_id):
     prompt = EXTRACT_PROMPT.format(
         attributes=", ".join(attributes),
@@ -93,29 +160,9 @@ def extract_chunk(llm, chunk, attributes, chunk_id):
     raw = _strip_fence(raw)
     try:
         data = json.loads(raw)
-        if isinstance(data, list):
-            # Validate — buang value nonsense
-            clean = []
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-                attr = str(item.get("attribute", "")).strip().lower()
-                val = str(item.get("value", "")).strip().lower()
-                if not attr or not val or len(val) > 50:
-                    continue
-                # Filter: age tak boleh jadi "gen z"
-                if attr == "age" and any(
-                    g in val for g in ["gen", "millennial", "alpha", "boomer"]
-                ):
-                    continue
-                # Filter: role tak boleh jadi username
-                if attr == "role" and val.startswith("@"):
-                    continue
-                clean.append({"attribute": attr, "value": val})
-            return clean
+        return _clean_attributes(data, set(attributes))
     except json.JSONDecodeError:
-        pass
-    return []
+        return []
 
 
 def build_graph(results):
@@ -152,7 +199,7 @@ def build_graph(results):
 
 
 def main():
-    print("=== ONTOLOGY EXTRACTION v2 ===\n")
+    print("=== ONTOLOGY EXTRACTION v3 ===\n")
 
     schema = load_schema()
     attributes = schema["attributes"]
@@ -194,21 +241,19 @@ def main():
     nodes, edges = build_graph(results)
 
     print(f"\n=== RESULT ===")
-    print(f"Chunks processed: {len(chunks)}")
-    print(f"Total attributes: {total_attrs}")
-    print(f"Avg attrs/chunk:  {total_attrs / len(chunks):.1f}")
+    print(f"Chunks: {len(chunks)}")
+    print(f"Total attrs: {total_attrs}")
+    print(f"Avg attrs/chunk: {total_attrs / len(chunks):.2f}")
     print(f"Nodes: {len(nodes)}")
     print(f"Edges: {len(edges)}")
 
-    # Attribute distribution
-    from collections import Counter
     attr_dist = Counter()
     for item in results:
         for a in item["attributes"]:
             attr_dist[a["attribute"]] += 1
-    print(f"\n=== ATTRIBUTE DISTRIBUTION ===")
+    print(f"\n=== DISTRIBUTION ===")
     for attr, count in attr_dist.most_common():
-        print(f"  {attr}: {count}")
+        print(f"  {attr}: {count} ({count/len(chunks)*100:.0f}%)")
 
     output = {
         "schema": attributes,
@@ -221,7 +266,7 @@ def main():
     print(f"\nSaved: {OUTPUT_FILE.name}")
 
     print(f"\n=== SAMPLE NODES ===")
-    for n in nodes[:8]:
+    for n in nodes[:10]:
         print(f"  {n['id']} ({n['kind']})")
 
 
