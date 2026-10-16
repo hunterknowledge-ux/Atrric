@@ -1,20 +1,21 @@
 """
 core/ontology_induction_poc.py
 
-Iterative Schema Induction untuk ATRRIC.
+Iterative Schema Induction untuk ATRRIC — v3.
 Berdasarkan kertas: Avram et al. (Okt 2026)
 
-Update v2:
-- 10 iterasi (bukan 3)
-- 50 chunk sample (bukan 10)
-- Better consolidation prompt (explicit rules)
-- Convergence check (80% overlap)
-- Track core attributes
+v3 changes:
+- Retry dengan exponential backoff (SSL/network fail)
+- Delay 0.5s antara call (elak rate limit)
+- Sample 20 chunk (bukan 50)
+- 5 iterasi max (bukan 10)
+- Save progress (resume kalau crash)
 """
 
 import json
 import re
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -29,8 +30,15 @@ from core.ilmu_llm import IlmuLLM
 from core.store import _get_db
 
 
+PROGRESS_FILE = _ROOT / "ontology_progress.json"
+SAMPLE_SIZE = 20
+MAX_ITERATIONS = 5
+DELAY_BETWEEN_CALLS = 0.5
+MAX_RETRIES = 3
+
+
 # ══════════════════════════════════════════════════════════
-# STEP 1 — EXTRACT ATTRIBUTES (per chunk)
+# STEP 1 — EXTRACT (per chunk, dengan retry)
 # ══════════════════════════════════════════════════════════
 
 EXTRACT_PROMPT = """Extract implicit attributes from this Malaysian social media comment.
@@ -44,7 +52,7 @@ Rules:
 - Attribute names: free-form, in English, lowercase
 - Only extract attributes CLEARLY stated or strongly implied
 - Focus on: emotion, topic, target_group, stance, tone, generation
-- Skip meta: observation, reference, response (bukan attribute)
+- Skip meta: observation, reference, response
 - Skip short/empty chunks
 - No explanation. Output JSON only.
 
@@ -54,26 +62,60 @@ Comment:
 Output:"""
 
 
+def _safe_generate(llm, prompt, max_tokens, temperature, chunk_id):
+    """Generate dengan retry + backoff."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return llm.generate(prompt, max_tokens=max_tokens, temperature=temperature)
+        except Exception as e:
+            wait = 2 ** attempt
+            err_type = type(e).__name__
+            if attempt < MAX_RETRIES - 1:
+                print(f"    [retry {attempt+1}] chunk {chunk_id}: {err_type}, wait {wait}s")
+                time.sleep(wait)
+            else:
+                print(f"    [FAIL] chunk {chunk_id}: {err_type}")
+    return None
+
+
+def _strip_fence(raw):
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw)
+    return raw
+
+
 def extract_attributes(llm, chunks):
     all_attrs = []
     fails = 0
     for i, chunk in enumerate(chunks):
+        print(f"  chunk {i+1}/{len(chunks)}...", end=" ", flush=True)
         prompt = EXTRACT_PROMPT.format(chunk=chunk[:500])
-        raw = llm.generate(prompt, max_tokens=800, temperature=0.3)
+        raw = _safe_generate(llm, prompt, 800, 0.3, i)
 
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = re.sub(r"^```(?:json)?\n?", "", raw)
-            raw = re.sub(r"\n?```$", "", raw)
+        if raw is None:
+            fails += 1
+            print("FAIL")
+            time.sleep(DELAY_BETWEEN_CALLS)
+            continue
 
+        raw = _strip_fence(raw)
         try:
             data = json.loads(raw)
             if isinstance(data, dict):
                 data = data.get("attributes", data.get("data", []))
             if isinstance(data, list):
                 all_attrs.extend(data)
+                print(f"ok ({len(data)} attrs)")
+            else:
+                print("not list")
+                fails += 1
         except json.JSONDecodeError:
+            print("json fail")
             fails += 1
+
+        time.sleep(DELAY_BETWEEN_CALLS)
 
     return all_attrs, fails
 
@@ -93,7 +135,7 @@ def aggregate(attributes):
 
 
 # ══════════════════════════════════════════════════════════
-# STEP 3 — CONSOLIDATE (Better prompt)
+# STEP 3 — CONSOLIDATE
 # ══════════════════════════════════════════════════════════
 
 CONSOLIDATE_PROMPT = """These are attribute names extracted from social media comments.
@@ -123,13 +165,12 @@ def consolidate(llm, counter, top_k=20):
         return [{"canonical": n, "aliases": [n]} for n in names]
 
     prompt = CONSOLIDATE_PROMPT.format(attrs="\n".join(names))
-    raw = llm.generate(prompt, max_tokens=1500, temperature=0.2)
+    raw = _safe_generate(llm, prompt, 1500, 0.2, "consolidate")
 
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = re.sub(r"^```(?:json)?\n?", "", raw)
-        raw = re.sub(r"\n?```$", "", raw)
+    if raw is None:
+        return [{"canonical": n, "aliases": [n]} for n in names]
 
+    raw = _strip_fence(raw)
     try:
         clusters = json.loads(raw)
         if isinstance(clusters, list):
@@ -141,7 +182,7 @@ def consolidate(llm, counter, top_k=20):
 
 
 # ══════════════════════════════════════════════════════════
-# STEP 4 — CONVERGENCE CHECK (80% overlap)
+# STEP 4 — CONVERGENCE
 # ══════════════════════════════════════════════════════════
 
 def is_converged(prev_schema, schema, threshold=0.8):
@@ -151,18 +192,16 @@ def is_converged(prev_schema, schema, threshold=0.8):
     union = len(prev_schema | schema)
     if union == 0:
         return False
-    overlap = intersection / union
-    return overlap >= threshold
+    return (intersection / union) >= threshold
 
 
 # ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
 
-def load_sample_chunks(n=50):
+def load_sample_chunks(n=SAMPLE_SIZE):
     db = _get_db()
-    meta_path = db.metadata_file
-    with open(meta_path) as f:
+    with open(db.metadata_file) as f:
         meta = json.load(f)
     docs = meta.get("documents", {})
     chunks = []
@@ -175,45 +214,74 @@ def load_sample_chunks(n=50):
     return chunks
 
 
+def save_progress(iteration, schemas):
+    PROGRESS_FILE.write_text(json.dumps({
+        "last_iter": iteration,
+        "schemas": [sorted(s) for s in schemas],
+    }, indent=2))
+
+
+def load_progress():
+    if PROGRESS_FILE.exists():
+        try:
+            data = json.loads(PROGRESS_FILE.read_text())
+            return data.get("last_iter", 0), [set(s) for s in data.get("schemas", [])]
+        except Exception:
+            pass
+    return 0, []
+
+
 def main():
-    print("=== ONTOLOGY INDUCTION (v2) ===\n")
+    print("=== ONTOLOGY INDUCTION v3 ===\n")
 
     llm = IlmuLLM()
     print(f"Model: {llm.model}")
 
-    chunks = load_sample_chunks(50)
+    chunks = load_sample_chunks(SAMPLE_SIZE)
     print(f"Sample: {len(chunks)} chunks")
-    print(f"Max iterations: 10\n")
+    print(f"Max iterations: {MAX_ITERATIONS}")
+    print(f"Est. cost: ~RM0.05\n")
 
-    prev_schema = None
+    start_iter, all_schemas = load_progress()
+    if start_iter > 0:
+        print(f"Resuming from iteration {start_iter + 1}")
+        prev_schema = all_schemas[-1] if all_schemas else None
+    else:
+        start_iter = 1
+        prev_schema = None
+        all_schemas = []
+
     schema = set()
-    all_schemas = []
-    total_fails = 0
 
-    for iteration in range(1, 11):
-        print(f"--- Iteration {iteration} ---")
+    try:
+        for iteration in range(start_iter, MAX_ITERATIONS + 1):
+            print(f"\n--- Iteration {iteration} ---")
 
-        attrs, fails = extract_attributes(llm, chunks)
-        total_fails += fails
-        print(f"  Extracted: {len(attrs)} pairs (fails: {fails})")
+            attrs, fails = extract_attributes(llm, chunks)
+            print(f"  Extracted: {len(attrs)} pairs (fails: {fails})")
 
-        counter = aggregate(attrs)
-        print(f"  Unique: {len(counter)}")
-        print(f"  Top 5: {counter.most_common(5)}")
+            counter = aggregate(attrs)
+            print(f"  Unique: {len(counter)}")
+            print(f"  Top 5: {counter.most_common(5)}")
 
-        clusters = consolidate(llm, counter, top_k=20)
-        schema = {c["canonical"] for c in clusters if c.get("canonical")}
-        all_schemas.append(schema)
-        print(f"  Schema ({len(schema)}): {sorted(schema)}")
+            clusters = consolidate(llm, counter, top_k=20)
+            schema = {c["canonical"] for c in clusters if c.get("canonical")}
+            all_schemas.append(schema)
+            print(f"  Schema ({len(schema)}): {sorted(schema)}")
 
-        if is_converged(prev_schema, schema):
-            print(f"  ✅ CONVERGED at iteration {iteration}\n")
-            break
+            save_progress(iteration, all_schemas)
 
-        prev_schema = schema
-        print()
+            if is_converged(prev_schema, schema):
+                print(f"  ✅ CONVERGED at iteration {iteration}")
+                break
 
-    # Core attributes — muncul 3+ iterasi
+            prev_schema = schema
+
+    except KeyboardInterrupt:
+        print("\n\n[!] Interrupted. Progress saved.")
+        print(f"    Run again untuk resume.")
+
+    # Core attributes
     print("\n=== CORE ATTRIBUTES (muncul 3+ iterasi) ===")
     attr_count = Counter()
     for s in all_schemas:
@@ -223,15 +291,12 @@ def main():
     for a in sorted(core):
         print(f"  {a}: {attr_count[a]}x")
 
-    # Final
     print("\n=== FINAL SCHEMA ===")
     print(f"Attributes: {sorted(schema)}")
     print(f"Core (stable): {sorted(core)}")
 
-    u = llm.last_usage
-    cost = u.get("prompt_tokens", 0) * 0.20/1e6 + u.get("completion_tokens", 0) * 1.20/1e6
-    print(f"\nLast call cost: RM{cost:.6f}")
-    print(f"Total JSON fails: {total_fails}")
+    if PROGRESS_FILE.exists():
+        print(f"\n💡 Delete progress to restart: rm {PROGRESS_FILE.name}")
 
 
 if __name__ == "__main__":
