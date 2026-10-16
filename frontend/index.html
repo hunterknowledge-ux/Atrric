@@ -1,242 +1,359 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="ms" class="bg-zinc-950">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#09090b">
+<meta name="color-scheme" content="dark">
 <title>Atrric</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <style>
-  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-  html, body { height: 100%; }
-  body { height: 100vh; height: 100dvh; overflow: hidden; }
+:root{--grad:linear-gradient(135deg,#6366f1,#8b5cf6)}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:#09090b;overscroll-behavior-y:none}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#f4f4f5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(70% 38% at 50% -6%,rgba(99,102,241,.16),transparent 70%)}
+#app{position:relative;z-index:1;height:100vh;height:100dvh;display:flex;flex-direction:column}
+:focus-visible{outline:2px solid #818cf8;outline-offset:2px}
 
-  .fade-in { animation: fadeIn .3s ease-out; }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+/* header */
+.glass{background:rgba(9,9,11,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.hline{position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.75),rgba(139,92,246,.75),transparent)}
+.beta{font-size:10px;font-weight:500;line-height:1;color:#c7d2fe;padding:3px 7px;border-radius:9999px;border:1px solid transparent;background:linear-gradient(#18181b,#18181b) padding-box,var(--grad) border-box}
 
-  .dots span {
-    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-    background: #71717a; margin-right: 4px;
-    animation: bounce 1.2s infinite;
-  }
-  .dots span:nth-child(2) { animation-delay: .15s; }
-  .dots span:nth-child(3) { animation-delay: .3s; }
-  @keyframes bounce {
-    0%, 60%, 100% { transform: translateY(0); opacity: .5; }
-    30%           { transform: translateY(-4px); opacity: 1; }
-  }
+/* main */
+#main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:#3f3f46 transparent}
+#hero{flex:none;margin:auto;width:100%;max-width:42rem;padding:40px 20px;text-align:center}
+#thread{flex:none;width:100%;max-width:42rem;margin:0 auto;padding:24px 16px 28px;display:flex;flex-direction:column;gap:22px}
+.ex{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:rgba(24,24,27,.6);border:1px solid #27272a;color:#d4d4d8;font-size:14px;line-height:1.45;cursor:pointer;transition:border-color .15s,background .15s,transform .1s}
+.ex:hover{border-color:rgba(129,140,248,.5);background:#18181b}
+.ex:active{transform:scale(.99)}
 
-  main::-webkit-scrollbar { width: 4px; }
-  main::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+/* avatars + rows */
+.av{flex:none;width:28px;height:28px;border-radius:9999px;display:grid;place-items:center;font-size:12px;font-weight:600;margin-top:2px}
+.av.ai{background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(139,92,246,.22));border:1px solid rgba(129,140,248,.35);color:#c7d2fe}
+.av.me{background:#27272a;border:1px solid #3f3f46;color:#d4d4d8}
+.av.big{width:44px;height:44px;font-size:18px;margin:0 auto}
+.row{display:flex;gap:10px;align-items:flex-start;transform-origin:left top;animation:pop .24s cubic-bezier(.2,.8,.2,1) both}
+.row.me{justify-content:flex-end;transform-origin:right bottom}
+.col{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.bub{border-radius:20px;padding:12px 16px;font-size:15px;line-height:1.65;min-width:0}
+.bub.me{background:#27272a;border-top-right-radius:6px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub.ai{background:#18181b;border:1px solid #27272a;border-top-left-radius:6px;max-width:100%}
+.bub.err{display:flex;gap:8px;align-items:flex-start;background:rgba(69,10,10,.28);border-color:rgba(127,29,29,.55);color:#fca5a5;font-size:14px}
+.bub.err .ic{flex:none;margin-top:3px;display:inline-flex}
+.bub.muted{color:#a1a1aa;font-size:14px}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(6px)}to{opacity:1;transform:none}}
 
-  /* markdown prose */
-  .md { line-height: 1.6; }
-  .md > *:first-child { margin-top: 0; }
-  .md > *:last-child  { margin-bottom: 0; }
-  .md p   { margin: 0 0 .75em; }
-  .md strong { color: #fafafa; font-weight: 600; }
-  .md em  { color: #e4e4e7; }
-  .md ul, .md ol { margin: 0 0 .75em; padding-left: 1.25em; }
-  .md ul { list-style: disc; }
-  .md ol { list-style: decimal; }
-  .md li { margin: .15em 0; }
-  .md li > p { margin: 0; }
-  .md h1, .md h2, .md h3, .md h4 { font-weight: 600; color: #fafafa; margin: 1em 0 .5em; line-height: 1.3; }
-  .md h1 { font-size: 1.15em; }
-  .md h2 { font-size: 1.08em; }
-  .md h3 { font-size: 1em; }
-  .md code {
-    background: #27272a; color: #fafafa;
-    padding: .1em .35em; border-radius: 4px;
-    font-size: .85em; font-family: ui-monospace, "Courier New", monospace;
-  }
-  .md pre {
-    background: #18181b; border: 1px solid #27272a;
-    padding: .75em; border-radius: 8px;
-    overflow-x: auto; margin: 0 0 .75em;
-    font-size: .82em;
-  }
-  .md pre code { background: transparent; padding: 0; font-size: 1em; }
-  .md a { color: #a1a1aa; text-decoration: underline; text-underline-offset: 2px; }
-  .md a:hover { color: #fafafa; }
-  .md blockquote {
-    border-left: 2px solid #3f3f46; padding-left: .75em;
-    color: #a1a1aa; margin: 0 0 .75em;
-  }
-  .md hr { border: 0; border-top: 1px solid #27272a; margin: 1em 0; }
+/* typing dots */
+.dots{display:flex;gap:6px;padding:6px 2px}
+.dots i{width:7px;height:7px;border-radius:9999px;background:#818cf8;box-shadow:0 0 10px 1px rgba(129,140,248,.55);animation:bounce 1.1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}
+.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.55}30%{transform:translateY(-5px);opacity:1}}
+
+/* sources + actions */
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 10px 4px 8px;border-radius:9999px;background:rgba(24,24,27,.8);border:1px solid #27272a;color:#a1a1aa;font-size:12px;line-height:1.3}
+.chip svg{flex:none;color:#71717a}
+.chip .n{min-width:0;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip b{flex:none;font-weight:500;color:#71717a;font-variant-numeric:tabular-nums}
+.act{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 8px;margin-left:-8px;border:0;border-radius:8px;background:none;color:#71717a;font:inherit;font-size:12px;cursor:pointer;transition:color .15s,background .15s}
+.act:hover{color:#d4d4d8;background:#18181b}
+.act.ok{color:#a5b4fc}
+.act.retry{font-size:13px;color:#a5b4fc;text-decoration:underline;text-underline-offset:3px}
+
+/* composer */
+.composer{border-radius:18px;padding:1px;background:#27272a;transition:box-shadow .2s}
+.composer:focus-within{background:var(--grad);box-shadow:0 0 0 4px rgba(99,102,241,.13)}
+.composer-in{display:flex;align-items:flex-end;gap:8px;border-radius:17px;background:#18181b;padding:6px 6px 6px 16px}
+#q{flex:1;min-width:0;min-height:40px;max-height:144px;padding:8px 0;border:0;background:transparent;resize:none;color:#f4f4f5;font:inherit;font-size:15px;line-height:24px}
+#q:focus,#q:focus-visible{outline:none}
+#q::placeholder{color:#71717a}
+#send{flex:none;height:40px;padding:0 15px;border:0;border-radius:13px;display:inline-flex;align-items:center;gap:7px;color:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer;background:var(--grad);box-shadow:0 6px 18px -4px rgba(99,102,241,.65),inset 0 0 0 1px rgba(255,255,255,.08);transition:filter .15s,transform .1s,opacity .15s}
+#send:hover{filter:brightness(1.1)}
+#send:active{transform:scale(.97)}
+#send:disabled{opacity:.4;box-shadow:none;cursor:default;filter:none;transform:none}
+#send[data-mode="stop"]{background:#3f3f46;box-shadow:none}
+
+/* markdown */
+.prose{color:#e4e4e7;overflow-wrap:anywhere}
+.prose>*:first-child{margin-top:0}
+.prose>*:last-child{margin-bottom:0}
+.prose p{margin:.75em 0}
+.prose h1,.prose h2,.prose h3,.prose h4{color:#fafafa;font-weight:600;letter-spacing:-.01em;line-height:1.3;margin:1.4em 0 .5em}
+.prose h1{font-size:1.2em}
+.prose h2{font-size:1.1em}
+.prose h3,.prose h4{font-size:1em}
+.prose strong{color:#fafafa;font-weight:600}
+.prose ul,.prose ol{margin:.75em 0;padding-left:1.35em}
+.prose ul{list-style:disc}
+.prose ol{list-style:decimal}
+.prose li{margin:.3em 0;padding-left:.2em}
+.prose li::marker{color:#71717a}
+.prose li>ul,.prose li>ol{margin:.3em 0}
+.prose a{color:#a5b4fc;text-decoration:underline;text-decoration-color:rgba(165,180,252,.4);text-underline-offset:3px}
+.prose a:hover{text-decoration-color:currentColor}
+.prose code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em;background:#27272a;color:#e0e7ff;padding:.15em .4em;border-radius:6px}
+.prose pre{margin:.9em 0;padding:12px 14px;background:#09090b;border:1px solid #27272a;border-radius:12px;overflow-x:auto;max-width:100%;overflow-wrap:normal}
+.prose pre code{background:none;padding:0;border-radius:0;font-size:12.5px;line-height:1.6;color:#e4e4e7;white-space:pre}
+.prose blockquote{margin:.9em 0;padding:.1em 0 .1em 14px;border-left:2px solid rgba(129,140,248,.55);color:#a1a1aa}
+.prose hr{border:0;border-top:1px solid #27272a;margin:1.2em 0}
+.prose table{display:block;overflow-x:auto;border-collapse:collapse;margin:.9em 0;font-size:.93em}
+.prose th,.prose td{border:1px solid #27272a;padding:6px 10px;text-align:left}
+.prose th{background:#1f1f23;color:#fafafa;font-weight:600}
+
+@media (prefers-reduced-motion:reduce){.row{animation:none}.dots i{animation:none}}
 </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 flex flex-col">
+<body>
+<div id="app">
 
-  <!-- HEADER -->
-  <header class="shrink-0 border-b border-zinc-800 px-4 py-3 flex items-center gap-2 bg-zinc-950 z-10">
-    <span class="font-semibold tracking-tight">Atrric</span>
-    <span class="text-[10px] uppercase tracking-wider bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">beta</span>
+  <header class="glass shrink-0 relative">
+    <div class="max-w-2xl mx-auto px-4 h-14 flex items-center gap-2">
+      <span class="text-[17px] font-semibold tracking-tight">Atrric</span>
+      <span class="beta">beta</span>
+    </div>
+    <div class="hline"></div>
   </header>
 
-  <!-- MAIN -->
-  <main id="main" class="flex-1 overflow-y-auto px-4 py-6">
-
-    <!-- HERO -->
-    <section id="hero" class="max-w-2xl mx-auto">
-      <h1 class="text-xl font-semibold text-center mt-6 mb-6">Apa yang anda ingin tahu?</h1>
-      <div class="space-y-2">
-        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Apa trend skincare Gen Z Malaysia 2026?</button>
-        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Brand lokal apa viral di TikTok Malaysia?</button>
-        <button class="example w-full text-left px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-sm text-zinc-300 transition">Kenapa Gen Z Malaysia suka beli online?</button>
+  <main id="main">
+    <section id="hero">
+      <div class="av ai big">A</div>
+      <h1 class="mt-5 mb-7 text-[26px] leading-tight font-semibold tracking-tight">Apa yang anda ingin tahu?</h1>
+      <div class="space-y-2.5">
+        <button type="button" class="ex" data-q="Apa trend skincare Gen Z Malaysia 2026?">Apa trend skincare Gen Z Malaysia 2026?</button>
+        <button type="button" class="ex" data-q="Brand lokal apa viral di TikTok Malaysia?">Brand lokal apa viral di TikTok Malaysia?</button>
+        <button type="button" class="ex" data-q="Kenapa Gen Z Malaysia suka beli online?">Kenapa Gen Z Malaysia suka beli online?</button>
       </div>
     </section>
-
-    <!-- THREAD -->
-    <section id="thread" class="max-w-2xl mx-auto space-y-4 hidden"></section>
-
+    <div id="thread" role="log" aria-live="polite" hidden></div>
   </main>
 
-  <!-- INPUT -->
-  <footer class="shrink-0 border-t border-zinc-800 p-3 bg-zinc-950">
-    <form id="form" class="max-w-2xl mx-auto flex gap-2 items-end">
-      <textarea id="input" rows="1" placeholder="Taip soalan..."
-        class="flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-600 max-h-32"></textarea>
-      <button type="submit" id="send"
-        class="shrink-0 bg-zinc-100 text-zinc-900 rounded-xl px-4 py-2 text-sm font-medium hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
-        Hantar
-      </button>
-    </form>
+  <footer class="shrink-0" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
+    <div class="max-w-2xl mx-auto px-4 pt-2">
+      <div class="composer">
+        <div class="composer-in">
+          <textarea id="q" rows="1" placeholder="Taip soalan..." aria-label="Soalan" enterkeyhint="send" autocomplete="off"></textarea>
+          <button id="send" type="button" disabled></button>
+        </div>
+      </div>
+    </div>
   </footer>
 
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script>
-(function () {
-  const $form   = document.getElementById('form');
-  const $input  = document.getElementById('input');
-  const $send   = document.getElementById('send');
-  const $main   = document.getElementById('main');
-  const $hero   = document.getElementById('hero');
-  const $thread = document.getElementById('thread');
+(() => {
+  const USER_INITIAL = 'U'; // tukar kepada huruf pertama nama anda
+  const $ = id => document.getElementById(id);
+  const main = $('main'), hero = $('hero'), thread = $('thread'), input = $('q'), btn = $('send');
+  let busy = false, ctrl = null, lastQ = '';
 
-  let loading = false;
-
-  // --- helpers ---
-  const esc = s => String(s).replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-  const scrollBottom = () => { $main.scrollTop = $main.scrollHeight; };
-
-  const hideHero = () => {
-    if (!$hero.classList.contains('hidden')) {
-      $hero.classList.add('hidden');
-      $thread.classList.remove('hidden');
-    }
+  const svg = (d, s = 14, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const I = {
+    copy:  svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>'),
+    check: svg('<path d="M20 6 9 17l-5-5"/>'),
+    file:  svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>', 12),
+    warn:  svg('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>', 16),
+    send:  svg('<path d="M12 19V5M5 12l7-7 7 7"/>', 16, 2.4),
+    stop:  svg('<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/>', 16, 2)
   };
 
-  // markdown -> safe html
-  marked.setOptions({ breaks: true, gfm: true });
-  function renderMD(text) {
-    const raw = marked.parse(String(text || ''));
-    return DOMPurify.sanitize(raw);
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
   }
 
-  // --- render bubbles ---
-  function addUser(text) {
-    const el = document.createElement('div');
-    el.className = 'flex justify-end fade-in';
-    el.innerHTML = `<div class="bg-zinc-800 rounded-2xl rounded-br-md px-4 py-2 max-w-[85%] text-sm whitespace-pre-wrap break-words">${esc(text)}</div>`;
-    $thread.appendChild(el);
+  /* markdown: marked + DOMPurify (fallback: plain text bila CDN gagal) */
+  if (window.DOMPurify) {
+    DOMPurify.addHook('afterSanitizeAttributes', n => {
+      if (n.tagName === 'A') { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); }
+    });
   }
-
-  function addAI(text, sources, error) {
-    const el = document.createElement('div');
-    el.className = 'flex justify-start fade-in';
-
-    let html = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%] text-sm min-w-0">`;
-    if (error) {
-      html += `<div class="text-red-400 text-xs mb-2 break-words">⚠ ${esc(error)}</div>`;
-    }
-    if (text) {
-      html += `<div class="md break-words">${renderMD(text)}</div>`;
+  function renderMd(target, text) {
+    if (window.marked && window.DOMPurify) {
+      target.innerHTML = DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }), { FORBID_TAGS: ['style', 'img'] });
     } else {
-      html += `<div class="text-zinc-500">(tiada jawapan)</div>`;
+      target.textContent = text;
+      target.style.whiteSpace = 'pre-wrap';
     }
-    if (sources && sources.length) {
-      html += `<div class="flex flex-wrap gap-1.5 mt-3">`;
-      for (const s of sources) {
-        html += `<span class="text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">${esc(s)}</span>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
-    el.innerHTML = html;
-    $thread.appendChild(el);
   }
 
-  function addLoading() {
-    const el = document.createElement('div');
-    el.id = 'loading';
-    el.className = 'flex justify-start fade-in';
-    el.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl rounded-bl-md px-4 py-3"><div class="dots"><span></span><span></span><span></span></div></div>`;
-    $thread.appendChild(el);
+  /* scroll lock */
+  const nearBottom = () => main.scrollHeight - main.scrollTop - main.clientHeight < 120;
+  const toBottom = () => { main.scrollTop = main.scrollHeight; };
+  function add(node, force) {
+    const stick = force || nearBottom();
+    thread.appendChild(node);
+    if (stick) toBottom();
+  }
+  function swapIn(oldRow, newRow) {
+    const stick = nearBottom();
+    oldRow.remove();
+    thread.appendChild(newRow);
+    if (!stick) return;
+    if (newRow.offsetHeight > main.clientHeight * 0.8) {
+      main.scrollTop = newRow.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 12;
+    } else toBottom();
   }
 
-  const removeLoading = () => document.getElementById('loading')?.remove();
+  /* rows */
+  function userRow(text) {
+    const r = el('div', 'row me');
+    r.append(el('div', 'bub me', text), el('div', 'av me', USER_INITIAL));
+    return r;
+  }
+  function aiShell() {
+    const r = el('div', 'row'), c = el('div', 'col');
+    r.append(el('div', 'av ai', 'A'), c);
+    return { r, c };
+  }
+  function loadingRow() {
+    const { r, c } = aiShell();
+    const b = el('div', 'bub ai');
+    b.innerHTML = '<div class="dots" role="status" aria-label="Memuatkan"><i></i><i></i><i></i></div>';
+    c.append(b);
+    return r;
+  }
+  function chip(s) {
+    const m = s.match(/^(.*?)\s*\((\d*\.?\d+)\)\s*$/);
+    const c = el('span', 'chip');
+    c.title = s;
+    c.insertAdjacentHTML('beforeend', I.file);
+    c.append(el('span', 'n', m ? m[1] : s));
+    if (m) c.append(el('b', '', m[2]));
+    return c;
+  }
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; }
+    catch (_) {
+      try {
+        const ta = el('textarea');
+        ta.value = t; ta.style.cssText = 'position:fixed;top:0;opacity:0';
+        document.body.appendChild(ta); ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        return ok;
+      } catch (__) { return false; }
+    }
+  }
+  function copyBtn(text) {
+    const b = el('button', 'act');
+    b.type = 'button';
+    const paint = ok => {
+      b.innerHTML = (ok ? I.check : I.copy) + '<span>' + (ok ? 'Disalin' : 'Salin') + '</span>';
+      b.classList.toggle('ok', ok);
+    };
+    paint(false);
+    b.addEventListener('click', async () => {
+      if (!(await copyText(text))) return;
+      paint(true);
+      clearTimeout(b._t);
+      b._t = setTimeout(() => paint(false), 1500);
+    });
+    return b;
+  }
+  function answerRow(answer, sources) {
+    const { r, c } = aiShell();
+    const b = el('div', 'bub ai'), p = el('div', 'prose');
+    renderMd(p, answer);
+    b.append(p);
+    c.append(b);
+    if (sources.length) {
+      const w = el('div', 'chips');
+      sources.forEach(s => w.append(chip(s)));
+      c.append(w);
+    }
+    c.append(copyBtn(answer));
+    return r;
+  }
+  function errorRow(msg, stopped) {
+    const { r, c } = aiShell();
+    const b = el('div', 'bub ai ' + (stopped ? 'muted' : 'err'));
+    if (!stopped) b.insertAdjacentHTML('afterbegin', '<span class="ic">' + I.warn + '</span>');
+    b.append(el('span', '', msg));
+    c.append(b);
+    const a = el('button', 'act retry', 'Cuba lagi');
+    a.type = 'button';
+    a.dataset.retry = '1';
+    a.addEventListener('click', () => send(lastQ, { retry: true, row: r }));
+    c.append(a);
+    return r;
+  }
+  const cleanSources = s => Array.isArray(s) ? s.filter(x => typeof x === 'string' && x.trim()) : [];
 
-  // --- submit ---
-  async function submit(q) {
-    q = q.trim();
-    if (!q || loading) return;
+  /* composer state */
+  function fit() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 144) + 'px';
+  }
+  function sync() { btn.disabled = !busy && !input.value.trim(); }
+  function setBusy(v) {
+    busy = v;
+    btn.dataset.mode = v ? 'stop' : 'send';
+    btn.innerHTML = (v ? I.stop : I.send) + '<span>' + (v ? 'Henti' : 'Hantar') + '</span>';
+    btn.setAttribute('aria-label', v ? 'Henti' : 'Hantar');
+    sync();
+  }
 
-    loading = true;
-    $send.disabled = true;
-    $input.value = '';
-    $input.style.height = 'auto';
-
-    hideHero();
-    addUser(q);
-    addLoading();
-    scrollBottom();
-
+  /* send */
+  async function send(q, opts) {
+    const { retry = false, row = null } = opts || {};
+    q = (q || '').trim();
+    if (busy || !q) return;
+    lastQ = q;
+    thread.querySelectorAll('[data-retry]').forEach(n => n.remove());
+    hero.hidden = true;
+    thread.hidden = false;
+    if (retry) { if (row) row.remove(); }
+    else { add(userRow(q), true); input.value = ''; fit(); }
+    setBusy(true);
+    const loading = loadingRow();
+    add(loading, true);
+    ctrl = new AbortController();
+    let out;
     try {
-      const res  = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      removeLoading();
-      addAI(data.answer, data.sources, data.error);
+      const res = await fetch('/api/query?q=' + encodeURIComponent(q), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+      let data = null;
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok && !(data && data.error)) throw new Error('Ralat pelayan (' + res.status + ').');
+      if (!data) throw new Error('Respons pelayan tidak sah.');
+      const answer = typeof data.answer === 'string' ? data.answer : '';
+      const err = data.error || (answer.trim() ? '' : '(tiada jawapan)');
+      out = err ? errorRow(String(err)) : answerRow(answer, cleanSources(data.sources));
     } catch (e) {
-      removeLoading();
-      addAI('', [], 'Network error: ' + e.message);
-    } finally {
-      loading = false;
-      $send.disabled = false;
-      scrollBottom();
-      $input.focus();
+      if (e && e.name === 'AbortError') out = errorRow('Dihentikan.', true);
+      else if (e instanceof TypeError) out = errorRow('Tidak dapat menghubungi pelayan. Pastikan server di Termux sedang berjalan.');
+      else out = errorRow((e && e.message) || '(tiada jawapan)');
     }
+    swapIn(loading, out);
+    ctrl = null;
+    setBusy(false);
   }
 
-  // --- events ---
-  $form.addEventListener('submit', e => {
-    e.preventDefault();
-    submit($input.value);
-  });
-
-  $input.addEventListener('input', () => {
-    $input.style.height = 'auto';
-    $input.style.height = Math.min($input.scrollHeight, 128) + 'px';
-  });
-
-  $input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  /* events */
+  btn.addEventListener('click', () => { if (busy) { if (ctrl) ctrl.abort(); } else send(input.value); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
-      $form.requestSubmit();
+      if (!busy) send(input.value);
     }
   });
-
-  document.querySelectorAll('.example').forEach(btn => {
-    btn.addEventListener('click', () => submit(btn.textContent));
+  input.addEventListener('input', () => { fit(); sync(); });
+  hero.addEventListener('click', e => {
+    const b = e.target.closest('[data-q]');
+    if (b) send(b.dataset.q);
   });
+
+  setBusy(false);
 })();
 </script>
 </body>
