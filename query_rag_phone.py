@@ -2,7 +2,7 @@
 query_rag_phone.py - Query the RAG index (phone mode).
 
 Takes a user question, embeds it, searches the vector store,
-builds a SmolLM2 chat-template prompt, and calls the LLM.
+builds an OpenAI-compatible prompt, and calls ILMU API.
 """
 
 import argparse
@@ -16,6 +16,15 @@ import config
 from core.embed import embed, EmbedError
 from core.llm import generate, LLMError
 from core import store as vector_store
+
+
+SYSTEM_PROMPT = (
+    "Kau adalah pembantu analisis data. Jawab soalan pengguna berdasarkan "
+    "data yang diberi. Berikan jawapan terus dan jelas. "
+    "JANGAN mulakan dengan frasa seperti 'Berdasarkan bukti', 'Berdasarkan data', "
+    "'Based on the evidence', atau seumpamanya. "
+    "Terus jawab soalan. Kalau data tak cukup, kata tak tahu."
+)
 
 
 def query(question: str, top_k: int = None) -> None:
@@ -58,22 +67,13 @@ def query(question: str, top_k: int = None) -> None:
     # Build context
     context = "\n\n".join(r["chunk"]["text"] for r in results)
 
-    # Build prompt using SmolLM2 chat template
-    user_msg = (
-        f"Jawab soalan berdasarkan data ini sahaja. "
-        f"Jika data tidak mencukupi, katakan tidak tahu.\n\n"
-        f"Data:\n{context}\n\n"
-        f"Soalan: {question}"
-    )
-    prompt = (
-        f"<|im_start|>user\n{user_msg}<|im_end|>\n"
-        f"<|im_start|>assistant\n"
-    )
+    # Build prompt — OpenAI-compatible for ILMU
+    user_msg = f"Soalan: {question}\n\nData:\n{context}"
 
     # Generate
     print("Generating answer...")
     try:
-        answer = generate(prompt)
+        answer = generate(user_msg, system=SYSTEM_PROMPT)
     except LLMError as e:
         print(f"LLM failed: {e}")
         sys.exit(1)
