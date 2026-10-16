@@ -24,13 +24,14 @@ def _get_llm():
         _llm = IlmuLLM()
     return _llm
 
-
-def generate(prompt, max_tokens=None, timeout=None, **kwargs):
-    """Back-compat wrapper. Matches old llm.generate() signature."""
+def generate(prompt, max_tokens=None, timeout=None, system="", **kwargs):
+    """Back-compat wrapper. Now supports system prompt."""
     kw = {}
     if max_tokens is not None:
         kw["max_tokens"] = max_tokens
     if timeout is not None:
         kw["timeout"] = timeout
+    if system:
+        kw["system"] = system
     kw.update(kwargs)
     return _get_llm().generate(prompt, **kw)
