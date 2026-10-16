@@ -6,25 +6,25 @@ _D = [(re.compile(r"^\s*>{2,}\s*"), 2), (re.compile(r"^\s*>\s*"), 1),
       (re.compile(r"^\s*R:\s*", re.I), 1), (re.compile(r"^\s*OP:\s*", re.I), 0)]
 
 _HEADER_RE = re.compile(r"^\s*\[[^\]]+\]\s*$")
+_SKIP = {"__pycache__", "discovered", "out", "analytics_out"}
 
 def _depth(l):
     for pat, d in _D:
         if pat.match(l):
             return d, pat.sub("", l).strip()
     lead = len(l) - len(l.lstrip(" "))
-    if lead >= 4:
-        return 2, l.strip()
-    if lead >= 2:
-        return 1, l.strip()
+    if lead >= 4: return 2, l.strip()
+    if lead >= 2: return 1, l.strip()
     return 0, l.strip()
 
 def load_all(raw_root="raw_data"):
     root = Path(raw_root)
+    if not root.exists():
+        return []
     out = []
-    for sub in ["raw_data", "threads", "youtube"]:
-        d = root / sub
-        if not d.exists():
-            continue
+    for d in sorted(root.iterdir()):
+        if not d.is_dir(): continue
+        if d.name.startswith(".") or d.name in _SKIP: continue
         for f in sorted(d.glob("*.txt")):
             lines = [
                 l for l in f.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -37,7 +37,7 @@ def load_all(raw_root="raw_data"):
                 text = clean(text)
                 if text:
                     out.append({
-                        "id": f"{sub}_{f.stem}_{i:04d}",
+                        "id": f"{d.name}_{f.stem}_{i:04d}",
                         "source": f.name,
                         "depth": depth,
                         "text": text,
