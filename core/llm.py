@@ -35,7 +35,7 @@ def generate(prompt, max_tokens=None, timeout=None, system="", **kwargs):
         prompt: user prompt
         max_tokens: max output tokens
         timeout: request timeout seconds
-        system: optional system prompt (ILMU supports via system= kwarg)
+        system: optional system prompt
         **kwargs: passthrough
 
     Returns:
