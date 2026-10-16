@@ -1,7 +1,8 @@
 """
-core/llm.py - Back-compat shim.
+core/llm.py — Back-compat shim for LLM calls.
 
-Redirects LLM calls to ILMU API (cloud, fast).
+Redirects to ILMU API (cloud). Supports system prompt.
+
 Old llama-cli implementation: core/llm_llama_backup.py
 """
 
@@ -19,13 +20,27 @@ _llm = None
 
 
 def _get_llm():
+    """Lazy singleton for IlmuLLM."""
     global _llm
     if _llm is None:
         _llm = IlmuLLM()
     return _llm
 
+
 def generate(prompt, max_tokens=None, timeout=None, system="", **kwargs):
-    """Back-compat wrapper. Now supports system prompt."""
+    """
+    Back-compat wrapper. Matches old llm.generate() signature.
+
+    Args:
+        prompt: user prompt
+        max_tokens: max output tokens
+        timeout: request timeout seconds
+        system: optional system prompt (ILMU supports via system= kwarg)
+        **kwargs: passthrough
+
+    Returns:
+        Generated text string.
+    """
     kw = {}
     if max_tokens is not None:
         kw["max_tokens"] = max_tokens
@@ -34,4 +49,5 @@ def generate(prompt, max_tokens=None, timeout=None, system="", **kwargs):
     if system:
         kw["system"] = system
     kw.update(kwargs)
+
     return _get_llm().generate(prompt, **kw)
