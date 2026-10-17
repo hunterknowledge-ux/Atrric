@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from collections import Counter
 from pathlib import Path
 from .store import load, save
@@ -10,22 +11,21 @@ _S = json.loads((Path(__file__).parent / "settings.json").read_text())
 
 VERIFY = """You are an expert in Malaysian social media language.
 For each item {word, ctx}, decide ONE of:
-- "entity": proper noun, brand, org, person, country, acronym (e.g. SISPAA, TikTok, KPM)
-- "slang":  colloquial/code word/internet slang (e.g. strawberi, skibidi, rizz, padu, gempak)
-- "normal": ordinary Bahasa Malaysia OR English word (e.g. bayar, cuba, waktu, school, value, then)
+- "entity": proper noun, brand, org, person, country, acronym (e.g. SISPAA, TikTok)
+- "slang":  colloquial/code word/internet slang (e.g. strawberi, skibidi, rizz, padu)
+- "normal": ordinary Bahasa Malaysia OR English word (e.g. bayar, cuba, school, value)
 
 IMPORTANT:
-1. Standard BM words are NOT slang. (e.g. bayar, cuba, dengar, terima, sebab, waktu)
-2. Standard English words are NOT slang. (e.g. school, value, then, best, focus)
-3. Read the context. If it's a normal word used normally, return "normal".
+1. Standard BM words are NOT slang.
+2. Standard English words are NOT slang.
+3. Read context. If normal, return "normal".
 
-STRICT JSON only: {"entity":["word1"], "slang":["word2"]}
-Return PLAIN STRINGS, no objects."""
+STRICT JSON only: {"entity":["word1"], "slang":["word2"]}"""
 
 TOPIC_DISCOVER = """Analyze Malaysian social media comments.
-Propose 10-15 BROAD topic categories. Must be lowercase, 1-2 words.
-Do NOT use specific entities (e.g. no 'sispaa', no 'haziq').
-Good: education, social, gov_service, economy, health, politics, tech
+Propose 10-15 BROAD topic categories. Lowercase, 1-2 words.
+Do NOT use specific entities.
+Good: education, social, gov_service, economy, health
 STRICT JSON only: {"topics":["topic1","topic2"]}"""
 
 def _coerce(x):
@@ -45,8 +45,9 @@ def _discover_topics(texts):
     if not texts: return []
     sample = [t[:300] for t in texts[:60]]
     try:
+        time.sleep(1.5)
         data = generate_json("Comments:\n" + "\n".join(f"- {t}" for t in sample),
-                             system=TOPIC_DISCOVER, max_tokens=600)
+                             system=TOPIC_DISCOVER, max_tokens=600, task="discover")
     except Exception as e:
         print(f"[discover] topic error: {e}"); return []
     if not data: return []
@@ -75,18 +76,17 @@ def _verify(cands, kind, texts):
         pat = re.compile(rf"\b{re.escape(w)}\b", re.I)
         for t in texts:
             for sent in t.split(". "):
-                if pat.search(sent): return sent[:150] # pendekkan context
+                if pat.search(sent): return sent[:150]
         return ""
     items = [{"word": w, "ctx": ctx_for(w)} for w in cands]
     ok = []
-    
-    # FIX: Batch size 10 untuk elak truncation
-    B = 10 
+    B = _S.get("llm_batch", 10)
     
     def _do_batch(chunk, tag=""):
         try:
+            time.sleep(1.5) # Elak rate limit
             data = generate_json(json.dumps(chunk, ensure_ascii=False),
-                                 system=VERIFY, max_tokens=4000)
+                                 system=VERIFY, max_tokens=4000, task="discover")
         except Exception as e:
             print(f"[discover] {kind} {tag} error: {e}"); return []
         if data is None: return None
@@ -117,10 +117,8 @@ def _normalize_entities(items):
         elif x.isupper() and len(x) <= 8:
             key = canon = x
         else:
-            if len(x) <= 6:
-                key = canon = x.upper()
-            else:
-                key, canon = x.lower(), x
+            if len(x) <= 6: key = canon = x.upper()
+            else: key, canon = x.lower(), x
         if key not in seen: seen[key] = canon
     return sorted(seen.values())
 
@@ -144,7 +142,6 @@ def run(items):
 
     e_ok = set(load("entities")); s_ok = set(load("slang"))
     e_new = [c for c in e_c if c not in e_ok]
-    # Buang entity dari senarai calon slang
     e_lower = {x.lower() for x in e_ok}
     s_new = [c for c in s_c if c not in s_ok and c.lower() not in e_lower]
 
