@@ -1,95 +1,56 @@
-"""
-core/llm.py — Back-compat shim for LLM calls.
-
-Redirects to ILMU API. Supports system prompt + prefill.
-
-Old llama-cli implementation: core/llm_llama_backup.py
-"""
-
+import json
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.ilmu_llm import IlmuLLM, IlmuError
+from core.router import get_model
 
 LLMError = IlmuError
 
-_llm = None
+_instances = {}
 
+def _get_llm(model_name: str) -> IlmuLLM:
+    global _instances
+    if model_name not in _instances:
+        _instances[model_name] = IlmuLLM(model=model_name)
+    return _instances[model_name]
 
-def _get_llm():
-    global _llm
-    if _llm is None:
-        _llm = IlmuLLM()
-    return _llm
-
-
-def generate(prompt, max_tokens=None, timeout=None, system="", prefill="", **kwargs):
-    """
-    Back-compat wrapper. Supports system + prefill.
-
-    Args:
-        prompt: user prompt
-        max_tokens: max output tokens
-        timeout: timeout seconds
-        system: system prompt
-        prefill: partial assistant message to force start
-        **kwargs: passthrough (temperature, etc.)
-
-    Returns:
-        Generated text string.
-    """
+def generate(prompt, max_tokens=None, timeout=None, system="", prefills="", task="default", model=None, **kwargs):
+    target_model = model or get_model(task)
+    
     kw = {}
-    if max_tokens is not None:
-        kw["max_tokens"] = max_tokens
-    if timeout is not None:
-        kw["timeout"] = timeout
-    if system:
-        kw["system"] = system
-    if prefill:
-        kw["prefill"] = prefill
+    if max_tokens is not None: kw["max_tokens"] = max_tokens
+    if timeout is not None: kw["timeout"] = timeout
+    if system: kw["system"] = system
+    if prefills: kw["prefill"] = prefills
     kw.update(kwargs)
 
-    return _get_llm().generate(prompt, **kw)
+    return _get_llm(target_model).generate(prompt, **kw)
 
-import json as _json
-import re as _re
+_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.M)
 
-_FENCE = _re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", _re.M)
-
-def generate_json(prompt, system="", max_tokens=None, **kw):
-    """generate() + strip markdown fence + parse JSON.
-    Return dict, atau None kalau parse fail."""
-    raw = generate(prompt, system=system, max_tokens=max_tokens, **kw)
-    if not raw:
+def generate_json(prompt, system="", max_tokens=None, task="default", model=None, **kw):
+    try:
+        raw = generate(prompt, system=system, max_tokens=max_tokens, task=task, model=model, **kw)
+    except Exception as e:
+        print(f"[llm] API ERROR: {type(e).__name__} - {e}")
         return None
+        
+    if not raw:
+        print("[llm] EMPTY RESPONSE dari API")
+        return None
+        
     s = _FENCE.sub("", raw).strip()
     if not s.startswith("{"):
         i, j = s.find("{"), s.rfind("}")
         if i >= 0 and j > i:
             s = s[i:j+1]
+            
     try:
-        return _json.loads(s)
-    except _json.JSONDecodeError:
-        return None
-# ── JSON helper (Analytics Layer) ─────────────────────────────
-import json as _json
-import re as _re
-
-_FENCE = _re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", _re.M)
-
-def generate_json(prompt, system="", max_tokens=None, **kw):
-    """generate() + strip markdown fence + parse JSON."""
-    raw = generate(prompt, system=system, max_tokens=max_tokens, **kw)
-    if not raw:
-        return None
-    s = _FENCE.sub("", raw).strip()
-    if not s.startswith("{"):
-        i, j = s.find("{"), s.rfind("}")
-        if i >= 0 and j > i:
-            s = s[i:j+1]
-    try:
-        return _json.loads(s)
-    except _json.JSONDecodeError:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        print(f"[llm] JSON PARSE FAIL. Raw: {s[:100]}...")
         return None
