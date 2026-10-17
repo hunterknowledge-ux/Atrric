@@ -32,18 +32,13 @@ def _split_exec_summary(cerita_utama: str) -> tuple[str | None, list[str]]:
     if not text: return None, []
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
     if len(paras) >= 2: return paras[0], paras[1:]
-    
-    # Fallback: pecah ikut ayat
     sents = re.split(r'(?<=[.!?])\s+', paras[0])
-    if len(sents) >= 3:
-        return " ".join(sents[:2]), [" ".join(sents[2:])]
+    if len(sents) >= 3: return " ".join(sents[:2]), [" ".join(sents[2:])]
     return None, paras
 
 def _split_long_text(text: str) -> list[str]:
-    """Pecahkan teks panjang kepada perenggan yang lebih kecil (max ~250 chars)."""
     text = (text or "").strip()
     if not text: return []
-    
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
     out = []
     for p in paras:
@@ -56,8 +51,7 @@ def _split_long_text(text: str) -> list[str]:
                     out.append(" ".join(chunk))
                     chunk = []
             if chunk: out.append(" ".join(chunk))
-        else:
-            out.append(p)
+        else: out.append(p)
     return out
 
 def _methodology_text(data: dict) -> str:
@@ -68,12 +62,6 @@ def _methodology_text(data: dict) -> str:
 
 def _disclaimer_text() -> str:
     return "Laporan ini dijana secara automatik oleh ATRRIC Report Layer v1. Data adalah berdasarkan sampel komen awam pada tempoh yang dinyatakan dan tidak mengklaim mewakili keseluruhan populasi Gen Z Malaysia. ATRRIC tidak menjamin ketepatan 100% untuk keputusan kritikal — sila gunakan sebagai rujukan strategik bersama analisis tambahan. Untuk analisis khusus atau custom scope, hubungi team ATRRIC."
-
-def _get_curated_quotes(picked: dict, narrative: dict) -> list[dict]:
-    """Gabungkan semula ID quote yang ditapis LLM dengan teks penuh."""
-    allowed_ids = {q["id"] for q in narrative.get("quotes_curated", []) if isinstance(q, dict) and "id" in q}
-    if not allowed_ids: return picked.get("top_quotes", [])[:5]
-    return [q for q in picked.get("top_quotes", []) if q["id"] in allowed_ids][:5]
 
 def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None = None) -> str:
     meta = meta or {}
@@ -87,8 +75,12 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    slang_data = narrative.get("slang_curated", [])
-    final_quotes = _get_curated_quotes(picked, narrative)
+    
+    # Guna slang dari Python (yang dah ditapis guna NLP Stopwords)
+    slang_data = picked.get("slang_raw", [])
+    
+    # Guna quotes dari picker (yang dah ditapis spam)
+    final_quotes = picked.get("top_quotes", [])
 
     lines.append("# ATRRIC · Market Intelligence\n\n**CONFIDENTIAL**\n")
     lines.append("| | |\n|---|---|")
@@ -276,8 +268,8 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    slang_data = narrative.get("slang_curated", [])
-    final_quotes = _get_curated_quotes(picked, narrative)
+    slang_data = picked.get("slang_raw", [])
+    final_quotes = picked.get("top_quotes", [])
 
     parts: list[str] = []
     parts.append("<!DOCTYPE html>")
@@ -399,14 +391,3 @@ def write_report(data: dict, picked: dict, narrative: dict, meta: dict | None = 
     md_path.write_text(md, encoding="utf-8")
     html_path.write_text(html_str, encoding="utf-8")
     return {"md": str(md_path), "html": str(html_path)}
-
-if __name__ == "__main__":
-    from report.loader import load_all
-    from report.picker import pick_all
-    print("=== TEMPLATE SELF-TEST ===")
-    data = load_all()
-    picked = pick_all(data)
-    narrative = {"headline": "Test", "cerita_utama": "P1\n\nP2", "insight": "Insight.", "rekomendasi": "Reko.", "slang_curated": [], "quotes_curated": [], "_meta": {"model": "test", "fallback": True}}
-    paths = write_report(data, picked, narrative)
-    print(f"OK report.md   → {paths['md']}")
-    print(f"OK report.html → {paths['html']}")
