@@ -12,13 +12,12 @@ SLANG_RAW_N      = 15
 TOPIC_BREAK_N    = 5
 QUOTE_MAX_CHARS  = 220
 
-# Senarai stopword Melayu standard (NLP practice)
 MALAY_STOPWORDS = {
     "lah", "bang", "jer", "korang", "mmg", "pon", "sbb", "skrg", "mcm", 
     "ckp", "sgt", "dlm", "yg", "tak", "dgn", "tp", "ni", "tu", "je", 
     "kot", "kan", "nak", "dah", "x", "bagi", "pada", "ada", "aku", "kau", 
-    "dia", "mereka", "kita", "kami", "kamu", "hahaha", "gila", "dorang", "utk", "geng",  
-"kat"
+    "dia", "mereka", "kita", "kami", "kamu", "hahaha", "gila", "dorang", 
+    "utk", "geng", "kat"
 }
 
 SPAM_KEYWORDS = {
@@ -39,8 +38,8 @@ def _is_spam(text: str) -> bool:
 def _is_meaningful_slang(word: str) -> bool:
     w = word.lower().strip()
     if len(w) < 2: return False
-    if w in MALAY_STOPWORDS: return False # Buang guna standard NLP stopwords
-    if not any(v in w for v in "aeiou"): return False # Buang yang takde vokal (cth: sbb)
+    if w in MALAY_STOPWORDS: return False
+    if not any(v in w for v in "aeiou"): return False
     return True
 
 def pick_all(data: dict) -> dict:
@@ -56,13 +55,16 @@ def pick_all(data: dict) -> dict:
         for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
-    # Tapis slang guna NLP standard filter
     raw_slang = summary.get("top_slang", [])
     clean_slang = [s for s in raw_slang if _is_meaningful_slang(s["word"])][:SLANG_RAW_N]
 
+    # Dapatkan senarai topik utama untuk tapis entity
+    by_topic = summary.get("by_topic", {})
+    main_topics = [t for t, _ in sorted(by_topic.items(), key=lambda kv: kv[1], reverse=True)[:5]]
+
     return {
         "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_N),
-        "entity_context":  pick_entity_context(summary.get("top_entities", []), comments, n=ENTITY_CTX_N, ex=ENTITY_EX_N),
+        "entity_context":  pick_entity_context(summary.get("top_entities", []), comments, n=ENTITY_CTX_N, ex=ENTITY_EX_N, main_topics=main_topics),
         "slang_raw":       clean_slang, 
         "topic_breakdown": pick_topic_breakdown(summary, comments, n=TOPIC_BREAK_N),
         "source_dist":     src_dist,
@@ -94,37 +96,39 @@ def _quote_shape(c: dict) -> dict:
     if len(text) > QUOTE_MAX_CHARS: text = text[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
     return {"id": c.get("id", ""), "text": text, "topic": c.get("topic", "unknown"), "sentiment": c.get("sentiment", "neutral"), "sentiment_score": float(c.get("sentiment_score", 0.0)), "entities": c.get("entities", [])[:5], "source": c.get("source", "")}
 
-def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int = 5, ex: int = 2) -> list[dict]:
+def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int = 5, ex: int = 2, main_topics: list[str] = None) -> list[dict]:
     if not top_entities: return []
+    if main_topics is None: main_topics = []
+    
     idx = defaultdict(list)
     for c in comments:
         for e in c.get("entities", []): idx[e].append(c)
 
     out = []
-    for entry in top_entities[:n]:
+    for entry in top_entities:
+        if len(out) >= n: break
         name, count = entry.get("name", ""), entry.get("count", 0)
         if not name: continue
         
-        # 1. Ambil semua quote yang sebut entiti ni & bukan spam
         pool = [c for c in idx.get(name, []) if not _is_spam(c.get("text", ""))]
         if not pool: continue
 
-        # 2. Cari topik dominan untuk entiti ni (Contextual Matching)
+        # Cari topik dominan untuk entiti ni
         topic_counts = defaultdict(int)
         for c in pool:
             if c.get("topic"): topic_counts[c.get("topic")] += 1
         
-        dominant_topic = None
         if topic_counts:
             dominant_topic = max(topic_counts.items(), key=lambda x: x[1])[0]
-            # Tapis pool supaya ambil quote dari topik dominan sahaja
-            filtered_pool = [c for c in pool if c.get("topic") == dominant_topic]
-            if filtered_pool:
-                pool = filtered_pool # Kalau ada, guna yang dah ditapis
+            
+            # FIX: Kalau topik dominan entiti ni bukan topik utama report, SKIP entiti ni
+            if main_topics and dominant_topic not in main_topics:
+                continue
 
-        # 3. Sort ikut emosi paling kuat
+            filtered_pool = [c for c in pool if c.get("topic") == dominant_topic]
+            if filtered_pool: pool = filtered_pool
+
         pool_sorted = sorted([c for c in pool if c.get("text")], key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
-        
         examples = []
         for c in pool_sorted[:ex]:
             t = c.get("text", "").strip()
