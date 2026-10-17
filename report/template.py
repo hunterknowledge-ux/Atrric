@@ -28,45 +28,25 @@ def _default_period() -> str:
     return datetime.now(timezone.utc).strftime("%B %Y")
 
 def _split_exec_summary(cerita_utama: str) -> tuple[str | None, list[str]]:
-    """Split cerita_utama: ambil 2 ayat pertama sebagai exec summary."""
     text = (cerita_utama or "").strip()
     if not text: return None, []
-    
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
-    if len(paras) >= 2:
-        return paras[0], paras[1:]
-
-    # Fallback: Kalau LLM bagi 1 paragraph je, split ikut ayat.
+    if len(paras) >= 2: return paras[0], paras[1:]
+    
+    # Fallback: Kalau LLM degil bagi 1 paragraph je, pecah ikut ayat
     sents = re.split(r'(?<=[.!?])\s+', paras[0])
     if len(sents) >= 3:
-        exec_sum = " ".join(sents[:2])
-        body_full = " ".join(sents[2:])
-        return exec_sum, [body_full]
-    
+        return " ".join(sents[:2]), [" ".join(sents[2:])]
     return None, paras
 
 def _methodology_text(data: dict) -> str:
     total = data.get("meta", {}).get("total_loaded", 0)
     sources = data.get("meta", {}).get("sources", [])
     src_str = ", ".join(sources) if sources else "platform terpilih"
-    return (
-        f"Laporan ini berdasarkan analisis {total} komen awam yang dikumpul "
-        f"dari {src_str}. Setiap komen diproses melalui pipeline ATRRIC: "
-        f"Extract → Process → Generate. Sentiment diklasifikasi menggunakan "
-        f"LLM, manakala entity dan slang di-discover secara automatik dari "
-        f"dataset melalui analytics layer. Insight kualitatif dijana dengan "
-        f"model bahasa berasaskan data yang sama untuk memastikan konsistensi."
-    )
+    return f"Laporan ini berdasarkan analisis {total} komen awam yang dikumpul dari {src_str}. Setiap komen diproses melalui pipeline ATRRIC: Extract → Process → Generate. Sentiment diklasifikasi menggunakan LLM, manakala entity dan slang di-discover secara automatik dari dataset melalui analytics layer. Insight kualitatif dijana dengan model bahasa berasaskan data yang sama untuk memastikan konsistensi."
 
 def _disclaimer_text() -> str:
-    return (
-        "Laporan ini dijana secara automatik oleh ATRRIC Report Layer v1. "
-        "Data adalah berdasarkan sampel komen awam pada tempoh yang dinyatakan "
-        "dan tidak mengklaim mewakili keseluruhan populasi Gen Z Malaysia. "
-        "ATRRIC tidak menjamin ketepatan 100% untuk keputusan kritikal — "
-        "sila gunakan sebagai rujukan strategik bersama analisis tambahan. "
-        "Untuk analisis khusus atau custom scope, hubungi team ATRRIC."
-    )
+    return "Laporan ini dijana secara automatik oleh ATRRIC Report Layer v1. Data adalah berdasarkan sampel komen awam pada tempoh yang dinyatakan dan tidak mengklaim mewakili keseluruhan populasi Gen Z Malaysia. ATRRIC tidak menjamin ketepatan 100% untuk keputusan kritikal — sila gunakan sebagai rujukan strategik bersama analisis tambahan. Untuk analisis khusus atau custom scope, hubungi team ATRRIC."
 
 def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None = None) -> str:
     meta = meta or {}
@@ -80,75 +60,60 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    
-    # Ambil slang dari LLM output, fallback ke picked
     slang_data = narrative.get("slang_curated") or picked.get("slang_raw", [])
 
-    # --- Cover block ---
-    lines.append("# ATRRIC · Market Intelligence")
-    lines.append("\n**CONFIDENTIAL**\n")
-    lines.append("| | |")
-    lines.append("|---|---|")
+    # Cover block
+    lines.append("# ATRRIC · Market Intelligence\n\n**CONFIDENTIAL**\n")
+    lines.append("| | |\n|---|---|")
     lines.append(f"| Prepared for | {prepared_for} |")
     lines.append(f"| Report ID | {report_id} |")
     lines.append(f"| Period | {period} |")
     lines.append(f"| Sample size | {total} komen |\n---\n")
 
-    # --- Title + lede ---
     lines.append(f"## Gen Z Malaysia Trend Report — {date_str}\n")
     lines.append(f"> *{narrative.get('headline', '')}*\n")
 
-    # --- TOC ---
     lines.append("### Kandungan\n")
-    for i, (_, title) in enumerate(SECTIONS, start=1):
-        lines.append(f"{i}. {title}")
+    for i, (_, title) in enumerate(SECTIONS, start=1): lines.append(f"{i}. {title}")
     lines.append("")
 
-    # --- 01 Exec summary ---
     lines.append("## 01 · Ringkasan Eksekutif\n")
     lines.append(f"> {exec_text}\n" if exec_text else "_(tiada ringkasan)_\n")
 
-    # --- 02 Snapshot ---
     lines.extend(_md_snapshot(summary))
     lines.append("")
 
-    # --- 03 Cerita Utama ---
     lines.append("## 03 · Cerita Utama\n")
-    for p in body_paras:
-        lines.append(f"{p}\n")
+    for p in body_paras: lines.append(f"{p}\n")
 
-    # --- 04 Suara Responden ---
     lines.extend(_md_quotes(picked.get("top_quotes", [])))
     lines.append("")
 
-    # --- 05 Topik Trending ---
     lines.extend(_md_topics(picked.get("topic_breakdown", [])))
     lines.append("")
 
-    # --- 06 Entiti ---
     lines.extend(_md_entities(picked.get("entity_context", [])))
     lines.append("")
 
-    # --- 07 Bahasa ---
     lines.extend(_md_slang(slang_data))
     lines.append("")
 
-    # --- 08 Insight ---
+    # --- FIX: Auto-split perenggan panjang untuk Markdown ---
+    insight_text = narrative.get('insight', '').strip()
+    insight_paras = _split_long_text(insight_text)
     lines.append("## 08 · Insight\n")
-    lines.append(f"{narrative.get('insight', '').strip()}\n")
+    for p in insight_paras: lines.append(f"{p}\n")
 
-    # --- 09 Rekomendasi ---
+    reco_text = narrative.get('rekomendasi', '').strip()
+    reco_paras = _split_long_text(reco_text)
     lines.append("## 09 · Rekomendasi\n")
-    lines.append(f"{narrative.get('rekomendasi', '').strip()}\n")
+    for p in reco_paras: lines.append(f"{p}\n")
 
-    # --- Methodology + Disclaimer ---
-    lines.append("---\n")
-    lines.append("## Metodologi\n")
+    lines.append("---\n## Metodologi\n")
     lines.append(f"{_methodology_text(data)}\n")
     lines.append("## Disclaimer\n")
     lines.append(f"{_disclaimer_text()}\n")
 
-    # --- Footer ---
     lines.append("---\n")
     model = narrative.get("_meta", {}).get("model", "-")
     cost = meta.get("cost_est_rm")
@@ -165,19 +130,12 @@ def _md_snapshot(summary: dict) -> list[str]:
     by_topic = summary.get("by_topic", {})
     top_topic = max(by_topic.items(), key=lambda kv: kv[1])[0] if by_topic else "-"
     def pct(n: int) -> str: return f"{round(100.0 * n / total, 1)}%" if total else "0%"
-    return [
-        "## 02 · Snapshot Data\n",
-        f"- **Total komen dianalisis**: {total}",
-        f"- **Topik dominan**: {top_topic}",
-        f"- **Sentiment**: {neg} negatif ({pct(neg)}) · {pos} positif ({pct(pos)}) · {neu} neutral ({pct(neu)})",
-    ]
+    return ["## 02 · Snapshot Data\n", f"- **Total komen dianalisis**: {total}", f"- **Topik dominan**: {top_topic}", f"- **Sentiment**: {neg} negatif ({pct(neg)}) · {pos} positif ({pct(pos)}) · {neu} neutral ({pct(neu)})"]
 
 def _md_quotes(quotes: list[dict]) -> list[str]:
     if not quotes: return ["## 04 · Suara Responden\n", "_(tiada quote tersedia)_"]
     out = ["## 04 · Suara Responden\n"]
-    for q in quotes:
-        tag = f"[{q['topic']} · {q['sentiment']}]"
-        out.append(f"> {q['text']}\n> — *{tag}*\n")
+    for q in quotes: out.append(f"> {q['text']}\n> — *[{q['topic']} · {q['sentiment']}]*\n")
     return out
 
 def _md_topics(breakdown: list[dict]) -> list[str]:
@@ -196,22 +154,30 @@ def _md_entities(entities: list[dict]) -> list[str]:
     out = ["## 06 · Entiti Utama\n"]
     for e in entities:
         out.append(f"### {e['name']} — {e['count']} sebutan\n")
-        for ex in e.get("examples", []):
-            out.append(f"> {ex}\n")
+        for ex in e.get("examples", []): out.append(f"> {ex}\n")
     return out
 
 def _md_slang(slang: list[dict]) -> list[str]:
     if not slang: return ["## 07 · Bahasa & Slang\n", "_(tiada slang signifikan)_"]
     out = ["## 07 · Bahasa & Slang\n", "Signature bahasa Gen Z dalam dataset ni:\n"]
-    for s in slang:
-        out.append(f"- **{s['word']}** ({s['count']}x) — {s.get('note', 'slanga Gen Z')}")
+    for s in slang: out.append(f"- **{s['word']}** ({s['count']}x) — {s.get('note', 'slanga Gen Z')}")
     return out
 
-# =============================================================================
-# CSS — SAMA MACAM SEBELUM NI (Consulting-grade B2B)
-# =============================================================================
+# --- HELPER BARU: Pecah teks panjang kepada perenggan ---
+def _split_long_text(text: str) -> list[str]:
+    text = (text or "").strip()
+    if not text: return []
+    # Kalau dah ada perenggan, guna je
+    if "\n\n" in text: return [p.strip() for p in text.split("\n\n") if p.strip()]
+    # Kalau sebesar dinding, pecahkan pada ayat.
+    if len(text) > 400:
+        sents = re.split(r'(?<=[.!?])\s+', text)
+        mid = len(sents) // 2
+        return [" ".join(sents[:mid]), " ".join(sents[mid:])]
+    return [text]
+
 _HTML_CSS = r"""
-/* ATRRIC Report Layer | consulting-grade B2B stylesheet. */
+/* CSS SAMA MACAM SEBELUM NI (Consulting-grade B2B) */
 :root{
   --surface:#faf9f7; --surface-2:#fffefc; --ink:#131313; --ink-2:#5a5a55;
   --accent:#1a2b47; --neg:#b04a3f; --pos:#2f6b46; --neutral:#8a8a85;
@@ -302,8 +268,6 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    
-    # Ambil slang dari LLM output, fallback ke picked
     slang_data = narrative.get("slang_curated") or picked.get("slang_raw", [])
 
     parts: list[str] = []
@@ -314,13 +278,8 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     parts.append(f"<style>{_HTML_CSS}</style>")
     parts.append("</head><body>")
 
-    parts.append('<header class="report-header">')
-    parts.append('<div class="brand">')
-    parts.append('<span class="brand-mark">ATRRIC</span>')
-    parts.append(f'<span class="brand-tag">{esc(DEFAULT_BRAND_TAG)}</span>')
-    parts.append("</div>")
-    parts.append('<span class="confidential-badge">Confidential</span>')
-    parts.append("</header>")
+    parts.append('<header class="report-header"><div class="brand"><span class="brand-mark">ATRRIC</span>')
+    parts.append(f'<span class="brand-tag">{esc(DEFAULT_BRAND_TAG)}</span></div><span class="confidential-badge">Confidential</span></header>')
 
     parts.append('<section class="report-meta">')
     for label, value in [("Prepared for", prepared_for), ("Report ID", report_id), ("Period", period), ("Sample size", f"{total} komen")]:
@@ -331,62 +290,50 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     parts.append(f'<p class="lede">{esc(narrative.get("headline", ""))}</p>')
 
     parts.append('<nav class="toc"><div class="toc-title">Kandungan</div><ol>')
-    for sid, title in SECTIONS:
-        parts.append(f'<li><a href="#{sid}">{esc(title)}</a></li>')
+    for sid, title in SECTIONS: parts.append(f'<li><a href="#{sid}">{esc(title)}</a></li>')
     parts.append("</ol></nav>")
 
-    parts.append('<section class="exec-summary" id="s01">')
-    parts.append('<h2><span class="sec-num">01</span>Ringkasan Eksekutif</h2>')
-    parts.append('<div class="callout">')
+    parts.append('<section class="exec-summary" id="s01"><h2><span class="sec-num">01</span>Ringkasan Eksekutif</h2><div class="callout">')
     parts.append(f"<p>{esc(exec_text)}</p>" if exec_text else "<p><i>(tiada ringkasan)</i></p>")
     parts.append("</div></section>")
 
-    parts.append('<section id="s02">')
-    parts.append('<h2><span class="sec-num">02</span>Snapshot Data</h2>')
+    parts.append('<section id="s02"><h2><span class="sec-num">02</span>Snapshot Data</h2>')
     parts.append(_html_snapshot(summary))
     parts.append("</section>")
 
-    parts.append('<section id="s03">')
-    parts.append('<h2><span class="sec-num">03</span>Cerita Utama</h2>')
+    parts.append('<section id="s03"><h2><span class="sec-num">03</span>Cerita Utama</h2>')
     if body_paras:
         for p in body_paras: parts.append(f"<p>{esc(p)}</p>")
     else: parts.append("<p><i>(tiada naratif)</i></p>")
     parts.append("</section>")
 
-    parts.append('<section id="s04">')
-    parts.append('<h2><span class="sec-num">04</span>Suara Responden</h2>')
+    parts.append('<section id="s04"><h2><span class="sec-num">04</span>Suara Responden</h2>')
     parts.append(_html_quotes(picked.get("top_quotes", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s05">')
-    parts.append('<h2><span class="sec-num">05</span>Topik Trending</h2>')
+    parts.append('<section id="s05"><h2><span class="sec-num">05</span>Topik Trending</h2>')
     parts.append(_html_topics(picked.get("topic_breakdown", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s06">')
-    parts.append('<h2><span class="sec-num">06</span>Entiti Utama</h2>')
+    parts.append('<section id="s06"><h2><span class="sec-num">06</span>Entiti Utama</h2>')
     parts.append(_html_entities(picked.get("entity_context", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s07">')
-    parts.append('<h2><span class="sec-num">07</span>Bahasa &amp; Slang</h2>')
+    parts.append('<section id="s07"><h2><span class="sec-num">07</span>Bahasa &amp; Slang</h2>')
     parts.append(_html_slang(slang_data))
     parts.append("</section>")
 
-    parts.append('<section id="s08">')
-    parts.append('<h2><span class="sec-num">08</span>Insight</h2>')
-    parts.append(_paras(narrative.get("insight", "")))
+    # --- FIX: Split perenggan panjang untuk HTML ---
+    parts.append('<section id="s08"><h2><span class="sec-num">08</span>Insight</h2>')
+    for p in _split_long_text(narrative.get("insight", "")): parts.append(f"<p>{esc(p)}</p>")
     parts.append("</section>")
 
-    parts.append('<section id="s09">')
-    parts.append('<h2><span class="sec-num">09</span>Rekomendasi</h2>')
-    parts.append(_paras(narrative.get("rekomendasi", "")))
+    parts.append('<section id="s09"><h2><span class="sec-num">09</span>Rekomendasi</h2>')
+    for p in _split_long_text(narrative.get("rekomendasi", "")): parts.append(f"<p>{esc(p)}</p>")
     parts.append("</section>")
 
-    parts.append('<section class="methodology"><h2>Metodologi</h2>')
-    parts.append(f"<p>{esc(_methodology_text(data))}</p></section>")
-    parts.append('<section class="disclaimer">')
-    parts.append(f"<p>{esc(_disclaimer_text())}</p></section>")
+    parts.append(f'<section class="methodology"><h2>Metodologi</h2><p>{esc(_methodology_text(data))}</p></section>')
+    parts.append(f'<section class="disclaimer"><p>{esc(_disclaimer_text())}</p></section>')
 
     model = narrative.get("_meta", {}).get("model", "-")
     cost = meta.get("cost_est_rm")
@@ -394,15 +341,11 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     parts.append("<footer>")
     parts.append('<div class="footer-brand">ATRRIC · Market Intelligence for Gen Z Malaysia</div>')
     parts.append(f'<div class="footer-meta">Report ID {esc(report_id)} · {total} komen · model <code>{esc(str(model))}</code> · kos {esc(cost_str)}</div>')
-    parts.append("</footer>")
-
-    parts.append("</body></html>")
+    parts.append("</footer></body></html>")
     return "\n".join(parts)
 
 def _paras(text: str) -> str:
-    text = (text or "").strip()
-    if not text: return ""
-    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+    blocks = _split_long_text(text)
     return "".join(f"<p>{html.escape(b)}</p>" for b in blocks)
 
 def _html_snapshot(summary: dict) -> str:
@@ -417,15 +360,11 @@ def _html_snapshot(summary: dict) -> str:
 
 def _html_quotes(quotes: list[dict]) -> str:
     if not quotes: return "<p><i>(tiada quote tersedia)</i></p>"
-    out: list[str] = []
-    for q in quotes:
-        tag = f"{q['topic']} · {q['sentiment']}"
-        out.append(f"<blockquote>{html.escape(q['text'])}<cite>— {html.escape(tag)}</cite></blockquote>")
-    return "\n".join(out)
+    return "\n".join(f"<blockquote>{html.escape(q['text'])}<cite>— {html.escape(q['topic'])} · {html.escape(q['sentiment'])}</cite></blockquote>" for q in quotes)
 
 def _html_topics(breakdown: list[dict]) -> str:
     if not breakdown: return "<p><i>(tiada data)</i></p>"
-    out: list[str] = []
+    out = []
     for tb in breakdown:
         s = tb["sentiment"]
         entities = ", ".join(tb.get("top_entities", [])) or "-"
@@ -434,7 +373,7 @@ def _html_topics(breakdown: list[dict]) -> str:
 
 def _html_entities(entities: list[dict]) -> str:
     if not entities: return "<p><i>(tiada data)</i></p>"
-    out: list[str] = []
+    out = []
     for e in entities:
         out.append(f'<div class="entity-card"><h3>{html.escape(e["name"])} — {e["count"]} sebutan</h3>')
         for ex in e.get("examples", []): out.append(f"<blockquote>{html.escape(ex)}</blockquote>")
@@ -444,8 +383,7 @@ def _html_entities(entities: list[dict]) -> str:
 def _html_slang(slang: list[dict]) -> str:
     if not slang: return "<p><i>(tiada slang signifikan)</i></p>"
     out = ['<ul class="slang-list">']
-    for s in slang:
-        out.append(f'<li><span class="slang-word">{html.escape(s["word"])}</span> <span>({s["count"]}x) — {html.escape(s.get("note", ""))}</span></li>')
+    for s in slang: out.append(f'<li><span class="slang-word">{html.escape(s["word"])}</span> <span>({s["count"]}x) — {html.escape(s.get("note", ""))}</span></li>')
     out.append("</ul>")
     return "\n".join(out)
 
@@ -453,8 +391,7 @@ def write_report(data: dict, picked: dict, narrative: dict, meta: dict | None = 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     md = render_markdown(data, picked, narrative, meta)
     html_str = render_html(data, picked, narrative, meta)
-    md_path = OUT_DIR / "report.md"
-    html_path = OUT_DIR / "report.html"
+    md_path, html_path = OUT_DIR / "report.md", OUT_DIR / "report.html"
     md_path.write_text(md, encoding="utf-8")
     html_path.write_text(html_str, encoding="utf-8")
     return {"md": str(md_path), "html": str(html_path)}
