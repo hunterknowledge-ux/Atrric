@@ -30,7 +30,33 @@ def generate(prompt, max_tokens=None, timeout=None, system="", prefills="", task
 
     return _get_llm(target_model).generate(prompt, **kw)
 
-_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.M)
+def _extract_json(text):
+    """Cari JSON block pertama dalam teks, walaupun LLM tambah ayat lain."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        char = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == '\\':
+                escape = True
+            elif char == '"':
+                in_string = False
+        else:
+            if char == '"':
+                in_string = True
+            elif char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    return text[start:i+1]
+    return None
 
 def generate_json(prompt, system="", max_tokens=None, task="default", model=None, **kw):
     try:
@@ -43,14 +69,14 @@ def generate_json(prompt, system="", max_tokens=None, task="default", model=None
         print("[llm] EMPTY RESPONSE dari API")
         return None
         
-    s = _FENCE.sub("", raw).strip()
-    if not s.startswith("{"):
-        i, j = s.find("{"), s.rfind("}")
-        if i >= 0 and j > i:
-            s = s[i:j+1]
-            
+    # Cari JSON block
+    s = _extract_json(raw)
+    if not s:
+        print(f"[llm] NO JSON FOUND. Raw: {raw[:100]}...")
+        return None
+        
     try:
         return json.loads(s)
-    except json.JSONDecodeError:
-        print(f"[llm] JSON PARSE FAIL. Raw: {s[:100]}...")
+    except json.JSONDecodeError as e:
+        print(f"[llm] JSON PARSE FAIL: {e}. Raw block: {s[:100]}...")
         return None
