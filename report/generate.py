@@ -1,5 +1,5 @@
 """
-report.generate — 2 LLM calls: 1 untuk naratif, 1 untuk tapis slang.
+report.generate — 2 LLM calls: 1 untuk naratif, 1 untuk tapis kualiti (slang + quotes).
 """
 
 from __future__ import annotations
@@ -19,12 +19,17 @@ PERATURAN KETAT:
 6. Output MESTI JSON sahaja.
 """
 
-SLANG_SYSTEM_PROMPT = """\
-Kau adalah pakar linguistik Gen Z Malaysia.
-Tugas kau: Tapis senarai perkataan yang diberi. 
-Buang singkatan Melayu (cth: utk, sbb, mmg), partikel (lah, pon, jer), dan perkataan pasar harian (gila, dorang, hahaha).
-KEKALKAN HANYA slang budaya Gen Z sebenar yang bernilai (cth: ceplos, sambung belajar, red flag, toxic).
-Return ONLY a valid JSON array of objects. Example: [{"word": "ceplos", "count": 8, "note": "gagal"}]
+FILTER_SYSTEM_PROMPT = """\
+Kau adalah Editor Kualiti Kanan.
+Tugas kau ada 2:
+1. TAPIS SLANG: Buang singkatan Melayu (utk, sbb), partikel (lah, pon), dan bahasa pasar (gila, hahaha). KEKALKAN HANYA slang budaya Gen Z sebenar (ceplos, red flag, dll).
+2. TAPIS QUOTE: Buang quote yang nampak macam iklan/spam (contoh: tawaran pinjaman, kripto, beli rumah). Pilih 5 quote terbaik yang paling ikhlas mewakili suara manusia.
+
+Output MESTI JSON sahaja dengan format:
+{
+  "slang_curated": [{"word": "ceplos", "count": 8, "note": "gagal"}],
+  "quotes_curated": [{"id": "id_quote_1"}, {"id": "id_quote_2"}]
+}
 """
 
 def _build_narrative_prompt(summary: dict, picked: dict, comments_count: int) -> str:
@@ -39,7 +44,6 @@ def _build_narrative_prompt(summary: dict, picked: dict, comments_count: int) ->
     tb_block = "\n".join(f"- {tb['topic']}: {tb['count']} komen ({tb['pct']}%), +{tb['sentiment']['positive']}/-{tb['sentiment']['negative']}/~{tb['sentiment']['neutral']}, top: {', '.join(tb['top_entities'])}" for tb in picked.get("topic_breakdown", [])) or "(tiada)"
 
     return f"""Data snapshot (Gen Z Malaysia, {comments_count} komen):
-
 SUMBER DATA: {src_dist}
 SENTIMENT: pos={by_sent.get('positive',0)} neg={by_sent.get('negative',0)} neu={by_sent.get('neutral',0)}
 TOP TOPICS: {topic_str}
@@ -52,15 +56,18 @@ CONTOH SUARA RAKYAT:
 {quotes_block}
 
 Tulis report dalam JSON dengan 4 field ini (semua string, guna \\n\\n untuk pisah perenggan):
-
 {{
   "headline": "satu ayat hook, 10-15 patah, grab attention. Sebut angka/entiti.",
   "cerita_utama": "2-3 perenggan naratif. Beri konteks KENAPA entiti ini disebut.",
   "insight": "1-2 perenggan. Analisis KENAPA trend ni jadi. Sambung sentiment + topik + entity.",
   "rekomendasi": "1-2 perenggan. Cadangan STRATEGIK spesifik. Elak ayat klise."
 }}
-
 Output JSON sahaja."""
+
+def _build_filter_prompt(picked: dict) -> str:
+    slang_in = json.dumps(picked.get("slang_raw", []), ensure_ascii=False)
+    quotes_in = json.dumps([{"id": q["id"], "text": q["text"]} for q in picked.get("top_quotes", [])], ensure_ascii=False)
+    return f"SLANG MENTAH:\n{slang_in}\n\nQUOTE MENTAH:\n{quotes_in}"
 
 def _fallback(summary: dict, picked: dict) -> dict:
     by_sent = summary.get("by_sentiment", {})
@@ -72,7 +79,8 @@ def _fallback(summary: dict, picked: dict) -> dict:
         "cerita_utama": f"Analisis {total} komen dari pelbagai platform menunjukkan dominasi sentiment negatif ({pct}%).\n\n(Naratif penuh tidak dapat dijana oleh LLM pada masa ini. Bahagian angka di bawah masih boleh dirujuk.)",
         "insight": "Analisis kualitatif tidak tersedia. Sila rujuk snapshot angka untuk gambaran kuantitatif.",
         "rekomendasi": "Jalankan semula report layer apabila LLM API kembali tersedia.",
-        "slang_curated": []
+        "slang_curated": [],
+        "quotes_curated": [q["id"] for q in picked.get("top_quotes", [])[:5]] # Fallback ke quote asal
     }
 
 def generate_narrative(data: dict, picked: dict, model: str | None = None) -> dict:
@@ -104,28 +112,29 @@ def generate_narrative(data: dict, picked: dict, model: str | None = None) -> di
         result["_meta"] = {"model": "fallback", "reason": "invalid LLM response shape", "fallback": True}
         return result
 
-    # --- CALL 2: Slang Filter ---
-    slang_input = json.dumps(picked.get("slang_raw", []), ensure_ascii=False)
-    slang_prompt = f"Senarai perkataan: {slang_input}"
-    slang_kwargs = {"prompt": slang_prompt, "system": SLANG_SYSTEM_PROMPT, "max_tokens": 400, "task": "report"}
+    # --- CALL 2: Quality Filter (Slang + Quotes) ---
+    filter_prompt = _build_filter_prompt(picked)
+    slang_kwargs = {"prompt": filter_prompt, "system": FILTER_SYSTEM_PROMPT, "max_tokens": 800, "task": "report"}
     if model: slang_kwargs["model"] = model
 
     try:
-        raw_slang = generate_json(**slang_kwargs)
-        # Pastikan ia list of dicts
-        if isinstance(raw_slang, list):
-            slang_curated = raw_slang
-        else:
-            slang_curated = []
+        raw_filter = generate_json(**slang_kwargs)
+        slang_curated = raw_filter.get("slang_curated", []) if isinstance(raw_filter, dict) else []
+        quotes_curated = raw_filter.get("quotes_curated", []) if isinstance(raw_filter, dict) else []
+        
+        # Pastikan quotes_curated ada 5. Kalau tak cukup, fallback.
+        if not isinstance(quotes_curated, list) or len(quotes_curated) < 3:
+            quotes_curated = [{"id": q["id"]} for q in picked.get("top_quotes", [])[:5]]
     except Exception:
-        # Kalau tapis slang fail, kita bagi kosong je dari tunjuk sampah
         slang_curated = []
+        quotes_curated = [{"id": q["id"]} for q in picked.get("top_quotes", [])[:5]]
 
     raw_narrative["slang_curated"] = slang_curated
+    raw_narrative["quotes_curated"] = quotes_curated
     raw_narrative["_meta"] = {
         "model": model or "default (router)",
-        "tokens_in_est": (len(prompt) + len(slang_prompt)) // 4,
-        "tokens_out_est": (sum(len(str(raw_narrative[k])) for k in required) + sum(len(str(s)) for s in slang_curated)) // 4,
+        "tokens_in_est": (len(prompt) + len(filter_prompt)) // 4,
+        "tokens_out_est": (sum(len(str(raw_narrative[k])) for k in required) + len(str(raw_filter))) // 4,
         "fallback": False,
     }
     return raw_narrative
