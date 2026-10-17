@@ -17,7 +17,8 @@ MALAY_STOPWORDS = {
     "lah", "bang", "jer", "korang", "mmg", "pon", "sbb", "skrg", "mcm", 
     "ckp", "sgt", "dlm", "yg", "tak", "dgn", "tp", "ni", "tu", "je", 
     "kot", "kan", "nak", "dah", "x", "bagi", "pada", "ada", "aku", "kau", 
-    "dia", "mereka", "kita", "kami", "kamu", "hahaha", "gila", "dorang"
+    "dia", "mereka", "kita", "kami", "kamu", "hahaha", "gila", "dorang", "utk", "geng",  
+"kat"
 }
 
 SPAM_KEYWORDS = {
