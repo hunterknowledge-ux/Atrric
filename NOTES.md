@@ -135,3 +135,26 @@ version is a later goal.
 ---
 
 *Last updated: 7 October 2026*
+
+
+# ATRRIC Roadmap & TODO
+
+## ✅ Fasa Semasa: Analytics Layer (Hampir Siap)
+- [x] Extract & Process (RAG)
+- [x] Auto-discovery (Entity, Slang, Topics) - Guna Flash
+- [x] Sentiment & Topic extraction - Guna Mini
+- [ ] Fix JSON Parser (sedang jalan)
+- [ ] Finalize Analytics Output (comments.jsonl & summary.json)
+
+## ⏳ Fasa Seterusnya: Report Layer
+- [ ] Bina Report Layer.
+- [ ] Guna Model **ILMU GLM 5.3 (Flagship)** untuk generate naratif.
+- [ ] Kos anggaran: ~RM0.04 per report. Berbaloi sebab 1-2 call je.
+- [ ] Routing: `"report": "ilmu-glm-5.3"` dalam settings.json.
+
+## 🛡️ Fasa Masa Depan: Cybersecurity Layer
+- [ ] Bila ATRRIC stabil, buka fasa Cybersecurity.
+- [ ] Guna Model **ILMU GLM 5.3 (Flagship)**.
+- [ ] Sangat SOTA untuk code review & vulnerability discovery (CyberGym 84.5%).
+- [ ] Routing: `"cyber": "ilmu-glm-5.3"` (Guna reasoning_effort: max).
+- [ ] Kos anggaran: ~RM0.34 per scan (50k input, 5k output).
