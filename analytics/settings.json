@@ -1,8 +1,14 @@
 {
+  "folders": ["raw_data", "threads", "youtube"],
   "min_count_entity": 3,
   "min_count_slang": 5,
-  "min_word_length": 4,
-  "llm_batch": 40,
+  "min_word_length": 3,
+  "llm_batch": 10,
   "max_text_chars": 800,
-  "top_n": 20
+  "top_n": 20,
+  "routing": {
+    "discover": "ilmu-glm-5.3-flash",
+    "extract": "ilmu-mini-v3.3",
+    "default": "ilmu-mini-v3.3"
+  }
 }
