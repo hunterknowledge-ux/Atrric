@@ -6,19 +6,19 @@ from __future__ import annotations
 import json
 from typing import Any
 
+# --- PROMPT BARU: STRICT ANALYST ---
 SYSTEM_PROMPT = """\
-Kau analyst market intelligence untuk Gen Z Malaysia.
-Tulis dalam Bahasa Melayu santai + English istilah teknikal bila perlu.
-Nada: profesional tapi mesra, macam report B2B untuk agency.
+Kau adalah Senior Market Intelligence Analyst untuk Gen Z Malaysia.
+Tugas kau adalah membedah data dan menghasilkan insight tajam untuk agensi B2B.
 
-TUGAS KAU:
-1. Tulis naratif mengikut format JSON yang diminta.
-2. TAPIS senarai SLANG VIRAL yang diberi. Buang singkatan Melayu biasa (contoh: utk, mre, sbb, lah). Kekalkan HANYA slang budaya Gen Z sebenar (contoh: ceplos, sambung belajar). Masukkan hasil tapis ke dalam JSON field "slang_curated".
-
-JANGAN guna bullet point. JANGAN guna header. Tulis paragraf je.
-JANGAN reka data — guna angka dan quote yang diberi sahaja.
-PENTING: Setiap paragraf dalam "cerita_utama" MESTI dipisah dengan \\n\\n.
-Output MESTI JSON sahaja, tiada teks lain di luar JSON.
+PERATURAN KETAT (WAJIB PATUH):
+1. JANGAN guna ayat klise/generik (contoh terlarang: "tekanan ekonomi", "perlu pendekatan empati", "kempen komunikasi yang responsif").
+2. Setiap Insight dan Rekomendasi MESTI merujuk kepada sekurang-kurangnya SATU entiti spesifik (cth: PTPTN, HAZIQ) dan SATU angka dari data.
+3. Bagi konteks kepada entiti. Jangan sekadar cakap "HAZIQ disebut 36 kali". Cakap KENAPA (cth: "HAZIQ dipuji kerana...").
+4. TAPIS senarai SLANG VIRAL. Buang singkatan Melayu biasa (cth: utk, mre, sbb). Kekalkan HANYA slang budaya Gen Z sebenar. Masukkan hasil tapis ke dalam JSON field "slang_curated".
+5. JANGAN guna bullet point dalam naratif. Tulis perenggan padu.
+6. PENTING: Setiap perenggan dalam "cerita_utama" MESTI dipisah dengan \\n\\n.
+7. Output MESTI JSON sahaja, tiada teks lain di luar JSON.
 """
 
 def _build_prompt(summary: dict, picked: dict, comments_count: int) -> str:
@@ -27,6 +27,7 @@ def _build_prompt(summary: dict, picked: dict, comments_count: int) -> str:
     by_topic = summary.get("by_topic", {})
     top_topics = sorted(by_topic.items(), key=lambda kv: kv[1], reverse=True)[:5]
     topic_str = ", ".join(f"{t}({n})" for t, n in top_topics)
+    src_dist = picked.get("source_dist", "unknown")
 
     quotes_block = "\n".join(
         f"- [{q['topic']}|{q['sentiment']}] {q['text'][:200]}"
@@ -46,6 +47,7 @@ def _build_prompt(summary: dict, picked: dict, comments_count: int) -> str:
 
     return f"""Data snapshot (Gen Z Malaysia, {comments_count} komen dianalisis):
 
+SUMBER DATA (Source Distribution): {src_dist}
 SENTIMENT: pos={by_sent.get('positive',0)} neg={by_sent.get('negative',0)} neu={by_sent.get('neutral',0)}
 TOP TOPICS: {topic_str}
 TOP ENTITIES: {top_ent}
@@ -57,16 +59,15 @@ TOPIC BREAKDOWN:
 CONTOH SUARA RAKYAT:
 {quotes_block}
 
-Tulis report dalam JSON dengan 5 field ini (semua string, guna \\n\\n untuk pisah paragraf):
+Tulis report dalam JSON dengan 5 field ini (semua string, guna \\n\\n untuk pisah perenggan):
 
 {{
-  "headline": "satu ayat hook, 10-15 patah, grab attention tapi jujur",
-  "cerita_utama": "2-3 paragraf naratif — apa yang Gen Z Malaysia risau/bual bulan ni. Guna angka sentimen + topik. Sebut entity utama.",
-  "insight": "1-2 paragraf — KENAPA trend ni jadi. Sambung sentiment + topic + entity jadi tafsiran.",
-  "rekomendasi": "1-2 paragraf — cadangan actionable untuk pembaca B2B. Nada: konstruktif.",
+  "headline": "satu ayat hook, 10-15 patah, grab attention. Sebut angka/entiti.",
+  "cerita_utama": "2-3 perenggan naratif. Guna angka sentimen + topik. Beri konteks KENAPA entiti ini disebut. Rujuk source distribution.",
+  "insight": "1-2 perenggan. Analisis KENAPA trend ni jadi (bukan sekadar apa). Sambung sentiment + topik + entity jadi tafsiran tajam.",
+  "rekomendasi": "1-2 perenggan. Cadangan STRATEGIK spesifik untuk agensi B2B. Elak ayat klise.",
   "slang_curated": [
-    {{"word": "ceplos", "count": 8, "note": "gagal / tak lepas"}},
-    {{"word": "sambung belajar", "count": 7, "note": "teruskan pengajian"}}
+    {{"word": "ceplos", "count": 8, "note": "gagal / tak lepas"}}
   ]
 }}
 
@@ -78,7 +79,6 @@ def _fallback(summary: dict, picked: dict) -> dict:
     neg = by_sent.get("negative", 0)
     pct = round(100.0 * neg / total, 1) if total else 0
     
-    # Fallback slang (guna mentah kalau LLM fail)
     raw_slang = picked.get("slang_raw", [])[:5]
     slang_fallback = [{"word": s["word"], "count": s["count"], "note": "slanga Gen Z"} for s in raw_slang]
 
@@ -106,8 +106,8 @@ def generate_narrative(data: dict, picked: dict, model: str | None = None) -> di
     kwargs: dict[str, Any] = {
         "prompt": prompt,
         "system": SYSTEM_PROMPT,
-        "max_tokens": 1800, # Naikkan sikit sebab ada slang_curated
-        "task": "report"    # Guna Router
+        "max_tokens": 1800,
+        "task": "report"
     }
     if model:
         kwargs["model"] = model
