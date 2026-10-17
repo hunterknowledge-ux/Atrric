@@ -20,7 +20,7 @@ from pathlib import Path
 
 from report.loader import load_all
 from report.picker import pick_all
-from report.generate import generate_narrative, _build_prompt
+from report.generate import generate_narrative, _build_narrative_prompt
 from report.template import write_report
 
 
