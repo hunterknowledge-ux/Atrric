@@ -18,9 +18,6 @@ SPAM_KEYWORDS = {
     "investment", "melabur", "scam", "click link", "klik link", "wa.me"
 }
 
-# Tambah sikit perkataan yang heuristik vokal terlepas
-FILLER_WORDS = {"lah", "bang", "korang", "hahaha", "geng", "pon", "jer", "mmg", "sbb", "skrg"}
-
 def _is_spam(text: str) -> bool:
     t_lower = text.lower()
     if len(text) > 300: return True
@@ -29,14 +26,6 @@ def _is_spam(text: str) -> bool:
     if len(text) > 30:
         caps = sum(1 for c in text if c.isupper())
         if caps / len(text) > 0.5: return True
-    return False
-
-def _is_shorthand(word: str) -> bool:
-    w = word.lower().strip()
-    if len(w) < 2: return True
-    if w in FILLER_WORDS: return True # Tapis benda macam 'lah', 'bang'
-    if not any(v in w for v in "aeiou"): return True # Tiada vokal
-    if len(w) <= 3 and w not in ["aku", "kau", "dia", "apa", "jom"]: return True
     return False
 
 def pick_all(data: dict) -> dict:
@@ -52,13 +41,13 @@ def pick_all(data: dict) -> dict:
         for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
-    raw_slang = summary.get("top_slang", [])
-    clean_slang = [s for s in raw_slang if not _is_shorthand(s["word"])][:SLANG_RAW_N]
+    # Ambil slang mentah terus. LLM akan tapis nanti.
+    raw_slang = summary.get("top_slang", [])[:SLANG_RAW_N]
 
     return {
         "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_N),
         "entity_context":  pick_entity_context(summary.get("top_entities", []), comments, n=ENTITY_CTX_N, ex=ENTITY_EX_N),
-        "slang_raw":       clean_slang, 
+        "slang_raw":       raw_slang, 
         "topic_breakdown": pick_topic_breakdown(summary, comments, n=TOPIC_BREAK_N),
         "source_dist":     src_dist,
     }
