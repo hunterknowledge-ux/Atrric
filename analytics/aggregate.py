@@ -67,12 +67,9 @@ def write(items, out_dir="analytics_out"):
         "total_comments": len(items),
         "by_type": dict(ty),
         "by_topic": dict(tc.most_common()),
-        "by_sentiment": {"negative": sc.get("negative",0),
-                          "neutral":  sc.get("neutral",0),
-                          "positive": sc.get("positive",0)},
+        "by_sentiment": {"negative": sc.get("negative",0), "neutral": sc.get("neutral",0), "positive": sc.get("positive",0)},
         "top_entities": [{"name":k,"count":v} for k,v in ec.most_common(20)],
         "top_slang":    [{"word":k,"count":v} for k,v in sl.most_common(20)],
     }
-    (out / "summary.json").write_text(
-        json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out / "summary.json").write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
     return s
