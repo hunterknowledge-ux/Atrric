@@ -13,7 +13,6 @@ SLANG_RAW_N      = 15
 TOPIC_BREAK_N    = 5
 QUOTE_MAX_CHARS  = 220
 
-# Heuristic spam filter (bukan hardcode bahasa, tapi tapis iklan/scam)
 SPAM_KEYWORDS = {
     "pinjaman", "whatsapp", "kripto", "crypto", "buy house", 
     "investment", "melabur", "scam", "click link", "klik link", "wa.me"
@@ -21,23 +20,34 @@ SPAM_KEYWORDS = {
 
 def _is_spam(text: str) -> bool:
     t_lower = text.lower()
-    # 1. Terlalu panjang (biasanya copy-paste iklan)
     if len(text) > 300: return True
-    # 2. Terlalu pendek (takde nilai insight)
     if len(text) < 10: return True
-    # 3. Ada keyword scam/iklan
     if any(kw in t_lower for kw in SPAM_KEYWORDS): return True
-    # 4. Terlalu banyak HURUF BESAR (shouting)
     if len(text) > 30:
         caps = sum(1 for c in text if c.isupper())
         if caps / len(text) > 0.5: return True
+    return False
+
+# --- BARU: Heuristik Tapis Shorthand Melayu (Tanpa Hardcode Senarai) ---
+def _is_shorthand(word: str) -> bool:
+    w = word.lower().strip()
+    if len(w) < 2: return True # Terlalu pendek
+    if w in ["yg", "tak", "x"]: return False # Exceptions yang bermakna
+    
+    # Kalau tiada langsung huruf vokal (a,e,i,o,u) -> Shorthand
+    if not any(v in w for v in "aeiou"):
+        return True
+        
+    # Kalau 3 huruf dan bukan perkataan biasa (cth: pon, jer, mmg)
+    if len(w) <= 3 and w not in ["aku", "kau", "dia", "apa", "jom", "lah", "kan"]:
+        return True
+        
     return False
 
 def pick_all(data: dict) -> dict:
     summary  = data.get("summary", {})
     comments = data.get("comments", [])
     
-    # Kira source distribution (dari mana data datang)
     src_counts = defaultdict(int)
     for c in comments:
         src_counts[c.get("source", "unknown")] += 1
@@ -47,39 +57,24 @@ def pick_all(data: dict) -> dict:
         for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
+    # Tapis slang mentah menggunakan heuristik Python sebelum hantar ke LLM
+    raw_slang = summary.get("top_slang", [])
+    clean_slang = [s for s in raw_slang if not _is_shorthand(s["word"])][:SLANG_RAW_N]
+
     return {
         "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_N),
-        "entity_context":  pick_entity_context(
-                              summary.get("top_entities", []),
-                              comments,
-                              n=ENTITY_CTX_N,
-                              ex=ENTITY_EX_N,
-                           ),
-        "slang_raw":       summary.get("top_slang", [])[:SLANG_RAW_N],
-        "topic_breakdown": pick_topic_breakdown(
-                              summary,
-                              comments,
-                              n=TOPIC_BREAK_N,
-                           ),
-        "source_dist":     src_dist, # Baru: untuk konteks LLM
+        "entity_context":  pick_entity_context(summary.get("top_entities", []), comments, n=ENTITY_CTX_N, ex=ENTITY_EX_N),
+        "slang_raw":       clean_slang, 
+        "topic_breakdown": pick_topic_breakdown(summary, comments, n=TOPIC_BREAK_N),
+        "source_dist":     src_dist,
     }
 
 def pick_top_quotes(comments: list[dict], n: int = 5) -> list[dict]:
     if not comments: return []
-    
-    # Tapis spam DULU sebelum sort ikut sentiment
-    candidates = [
-        c for c in comments
-        if c.get("text") 
-        and isinstance(c.get("sentiment_score"), (int, float))
-        and not _is_spam(c["text"])
-    ]
-    
+    candidates = [c for c in comments if c.get("text") and isinstance(c.get("sentiment_score"), (int, float)) and not _is_spam(c["text"])]
     candidates.sort(key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
 
-    picked: list[dict] = []
-    used_topics: set[str] = set()
-
+    picked, used_topics = [], set()
     for c in candidates:
         if len(picked) >= n: break
         topic = c.get("topic", "unknown")
@@ -97,61 +92,35 @@ def pick_top_quotes(comments: list[dict], n: int = 5) -> list[dict]:
 
 def _quote_shape(c: dict) -> dict:
     text = c.get("text", "").strip()
-    if len(text) > QUOTE_MAX_CHARS:
-        text = text[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
-    return {
-        "id":              c.get("id", ""),
-        "text":            text,
-        "topic":           c.get("topic", "unknown"),
-        "sentiment":       c.get("sentiment", "neutral"),
-        "sentiment_score": float(c.get("sentiment_score", 0.0)),
-        "entities":        c.get("entities", [])[:5],
-        "source":          c.get("source", ""),
-    }
+    if len(text) > QUOTE_MAX_CHARS: text = text[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
+    return {"id": c.get("id", ""), "text": text, "topic": c.get("topic", "unknown"), "sentiment": c.get("sentiment", "neutral"), "sentiment_score": float(c.get("sentiment_score", 0.0)), "entities": c.get("entities", [])[:5], "source": c.get("source", "")}
 
 def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int = 5, ex: int = 2) -> list[dict]:
     if not top_entities: return []
-    idx: dict[str, list[dict]] = defaultdict(list)
+    idx = defaultdict(list)
     for c in comments:
-        for e in c.get("entities", []):
-            idx[e].append(c)
+        for e in c.get("entities", []): idx[e].append(c)
 
-    out: list[dict] = []
+    out = []
     for entry in top_entities[:n]:
-        name = entry.get("name", "")
-        count = entry.get("count", 0)
+        name, count = entry.get("name", ""), entry.get("count", 0)
         if not name: continue
-
-        # Tapis spam untuk contoh entity juga
         pool = [c for c in idx.get(name, []) if not _is_spam(c.get("text", ""))]
-        pool_sorted = sorted(
-            [c for c in pool if c.get("text")],
-            key=lambda c: abs(c.get("sentiment_score", 0.0)),
-            reverse=True,
-        )
-
-        examples: list[str] = []
+        pool_sorted = sorted([c for c in pool if c.get("text")], key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
+        examples = []
         for c in pool_sorted[:ex]:
             t = c.get("text", "").strip()
-            if len(t) > QUOTE_MAX_CHARS:
-                t = t[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
+            if len(t) > QUOTE_MAX_CHARS: t = t[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
             examples.append(t)
-
         out.append({"name": name, "count": count, "examples": examples})
     return out
 
 def pick_topic_breakdown(summary: dict, comments: list[dict], n: int = 5) -> list[dict]:
     by_topic = summary.get("by_topic", {})
     if not by_topic: return []
-
     total = sum(by_topic.values()) or 1
     top_topics = sorted(by_topic.items(), key=lambda kv: kv[1], reverse=True)[:n]
-
-    stats: dict[str, dict] = {
-        t: {"pos": 0, "neg": 0, "neu": 0, "entities": defaultdict(int)}
-        for t, _ in top_topics
-    }
-
+    stats = {t: {"pos": 0, "neg": 0, "neu": 0, "entities": defaultdict(int)} for t, _ in top_topics}
     for c in comments:
         t = c.get("topic")
         if t not in stats: continue
@@ -159,18 +128,10 @@ def pick_topic_breakdown(summary: dict, comments: list[dict], n: int = 5) -> lis
         if s == "positive": stats[t]["pos"] += 1
         elif s == "negative": stats[t]["neg"] += 1
         else: stats[t]["neu"] += 1
-        for e in c.get("entities", []):
-            stats[t]["entities"][e] += 1
-
-    out: list[dict] = []
+        for e in c.get("entities", []): stats[t]["entities"][e] += 1
+    out = []
     for topic, count in top_topics:
         st = stats[topic]
         top_e = sorted(st["entities"].items(), key=lambda kv: kv[1], reverse=True)[:3]
-        out.append({
-            "topic": topic,
-            "count": count,
-            "pct": round(100.0 * count / total, 1),
-            "sentiment": {"positive": st["pos"], "negative": st["neg"], "neutral": st["neu"]},
-            "top_entities": [name for name, _ in top_e],
-        })
+        out.append({"topic": topic, "count": count, "pct": round(100.0 * count / total, 1), "sentiment": {"positive": st["pos"], "negative": st["neg"], "neutral": st["neu"]}, "top_entities": [name for name, _ in top_e]})
     return out
