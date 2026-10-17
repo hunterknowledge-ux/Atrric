@@ -10,5 +10,6 @@
     "discover": "ilmu-glm-5.3-flash",
     "extract": "ilmu-mini-v3.3",
     "default": "ilmu-mini-v3.3"
+    "report" : "ilmu-glm-5.3-flash"
   }
 }
