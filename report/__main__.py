@@ -101,7 +101,7 @@ def main() -> int:
     picked = pick_all(data)
     print(f"      ✓ {len(picked['top_quotes'])} quote, "
           f"{len(picked['entity_context'])} entity, "
-          f"{len(picked['slang_curated'])} slang, "
+          f"{len(picked['slang_raw'])} slang, "
           f"{len(picked['topic_breakdown'])} topic")
 
     # --- Dry run: berhenti sini ---
