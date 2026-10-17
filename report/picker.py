@@ -3,30 +3,15 @@ report.picker — rule-based selection. TAK panggil LLM.
 """
 
 from __future__ import annotations
-import re
 from collections import defaultdict
 
 TOP_QUOTES_N     = 5
+TOP_QUOTES_POOL  = 10  # Ambil 10 untuk LLM tapis jadi 5
 ENTITY_CTX_N     = 5
 ENTITY_EX_N      = 2
 SLANG_RAW_N      = 15
 TOPIC_BREAK_N    = 5
 QUOTE_MAX_CHARS  = 220
-
-SPAM_KEYWORDS = {
-    "pinjaman", "whatsapp", "kripto", "crypto", "buy house", 
-    "investment", "melabur", "scam", "click link", "klik link", "wa.me"
-}
-
-def _is_spam(text: str) -> bool:
-    t_lower = text.lower()
-    if len(text) > 300: return True
-    if len(text) < 10: return True
-    if any(kw in t_lower for kw in SPAM_KEYWORDS): return True
-    if len(text) > 30:
-        caps = sum(1 for c in text if c.isupper())
-        if caps / len(text) > 0.5: return True
-    return False
 
 def pick_all(data: dict) -> dict:
     summary  = data.get("summary", {})
@@ -41,20 +26,26 @@ def pick_all(data: dict) -> dict:
         for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
-    # Ambil slang mentah terus. LLM akan tapis nanti.
     raw_slang = summary.get("top_slang", [])[:SLANG_RAW_N]
 
     return {
-        "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_N),
+        "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_POOL),
         "entity_context":  pick_entity_context(summary.get("top_entities", []), comments, n=ENTITY_CTX_N, ex=ENTITY_EX_N),
         "slang_raw":       raw_slang, 
         "topic_breakdown": pick_topic_breakdown(summary, comments, n=TOPIC_BREAK_N),
         "source_dist":     src_dist,
     }
 
-def pick_top_quotes(comments: list[dict], n: int = 5) -> list[dict]:
+def pick_top_quotes(comments: list[dict], n: int = 10) -> list[dict]:
     if not comments: return []
-    candidates = [c for c in comments if c.get("text") and isinstance(c.get("sentiment_score"), (int, float)) and not _is_spam(c["text"])]
+    
+    # Tapis hanya benda paling asas (kosong/terlalu pendek). Biar LLM tapis spam.
+    candidates = [
+        c for c in comments 
+        if c.get("text") and len(c["text"].strip()) > 10 
+        and isinstance(c.get("sentiment_score"), (int, float))
+    ]
+    
     candidates.sort(key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
 
     picked, used_topics = [], set()
@@ -88,8 +79,7 @@ def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int =
     for entry in top_entities[:n]:
         name, count = entry.get("name", ""), entry.get("count", 0)
         if not name: continue
-        pool = [c for c in idx.get(name, []) if not _is_spam(c.get("text", ""))]
-        pool_sorted = sorted([c for c in pool if c.get("text")], key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
+        pool_sorted = sorted([c for c in idx.get(name, []) if c.get("text") and len(c["text"]) > 10], key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
         examples = []
         for c in pool_sorted[:ex]:
             t = c.get("text", "").strip()
