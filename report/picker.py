@@ -104,14 +104,32 @@ def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int =
         name, count = entry.get("name", ""), entry.get("count", 0)
         if not name: continue
         
-        # FIX: Tapis spam pada entity context juga
+        # 1. Ambil semua quote yang sebut entiti ni & bukan spam
         pool = [c for c in idx.get(name, []) if not _is_spam(c.get("text", ""))]
+        if not pool: continue
+
+        # 2. Cari topik dominan untuk entiti ni (Contextual Matching)
+        topic_counts = defaultdict(int)
+        for c in pool:
+            if c.get("topic"): topic_counts[c.get("topic")] += 1
+        
+        dominant_topic = None
+        if topic_counts:
+            dominant_topic = max(topic_counts.items(), key=lambda x: x[1])[0]
+            # Tapis pool supaya ambil quote dari topik dominan sahaja
+            filtered_pool = [c for c in pool if c.get("topic") == dominant_topic]
+            if filtered_pool:
+                pool = filtered_pool # Kalau ada, guna yang dah ditapis
+
+        # 3. Sort ikut emosi paling kuat
         pool_sorted = sorted([c for c in pool if c.get("text")], key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
+        
         examples = []
         for c in pool_sorted[:ex]:
             t = c.get("text", "").strip()
             if len(t) > QUOTE_MAX_CHARS: t = t[: QUOTE_MAX_CHARS - 1].rstrip() + "…"
             examples.append(t)
+            
         out.append({"name": name, "count": count, "examples": examples})
     return out
 
