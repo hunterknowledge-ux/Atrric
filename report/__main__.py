@@ -30,9 +30,9 @@ COST_PER_M_TOKEN_RM = 0.38
 
 def _estimate_cost(data: dict, picked: dict) -> dict:
     """Kira estimate kos tanpa call LLM."""
-    prompt = _build_prompt(
-        data["summary"], picked, data["meta"]["total_loaded"]
-    )
+    prompt = _build_narrative_prompt(
+    data["summary"], picked, data["meta"]["total_loaded"]
+)
     tokens_in = len(prompt) // 4
     tokens_out_max = 1500
     total_tokens = tokens_in + tokens_out_max
