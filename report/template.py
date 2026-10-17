@@ -39,6 +39,27 @@ def _split_exec_summary(cerita_utama: str) -> tuple[str | None, list[str]]:
         return " ".join(sents[:2]), [" ".join(sents[2:])]
     return None, paras
 
+def _split_long_text(text: str) -> list[str]:
+    """Pecahkan teks panjang kepada perenggan yang lebih kecil (max ~250 chars)."""
+    text = (text or "").strip()
+    if not text: return []
+    
+    paras = [p.strip() for p in text.split("\n\n") if p.strip()]
+    out = []
+    for p in paras:
+        if len(p) > 250:
+            sents = re.split(r'(?<=[.!?])\s+', p)
+            chunk = []
+            for s in sents:
+                chunk.append(s)
+                if len(" ".join(chunk)) > 200:
+                    out.append(" ".join(chunk))
+                    chunk = []
+            if chunk: out.append(" ".join(chunk))
+        else:
+            out.append(p)
+    return out
+
 def _methodology_text(data: dict) -> str:
     total = data.get("meta", {}).get("total_loaded", 0)
     sources = data.get("meta", {}).get("sources", [])
@@ -47,16 +68,6 @@ def _methodology_text(data: dict) -> str:
 
 def _disclaimer_text() -> str:
     return "Laporan ini dijana secara automatik oleh ATRRIC Report Layer v1. Data adalah berdasarkan sampel komen awam pada tempoh yang dinyatakan dan tidak mengklaim mewakili keseluruhan populasi Gen Z Malaysia. ATRRIC tidak menjamin ketepatan 100% untuk keputusan kritikal — sila gunakan sebagai rujukan strategik bersama analisis tambahan. Untuk analisis khusus atau custom scope, hubungi team ATRRIC."
-
-def _split_long_text(text: str) -> list[str]:
-    text = (text or "").strip()
-    if not text: return []
-    if "\n\n" in text: return [p.strip() for p in text.split("\n\n") if p.strip()]
-    if len(text) > 400:
-        sents = re.split(r'(?<=[.!?])\s+', text)
-        mid = len(sents) // 2
-        return [" ".join(sents[:mid]), " ".join(sents[mid:])]
-    return [text]
 
 def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None = None) -> str:
     meta = meta or {}
@@ -70,7 +81,7 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    slang_data = picked.get("slang_raw", [])
+    slang_data = narrative.get("slang_curated", [])
 
     lines.append("# ATRRIC · Market Intelligence\n\n**CONFIDENTIAL**\n")
     lines.append("| | |\n|---|---|")
@@ -97,20 +108,21 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
 
     lines.extend(_md_quotes(picked.get("top_quotes", [])))
     lines.append("")
+
     lines.extend(_md_topics(picked.get("topic_breakdown", [])))
     lines.append("")
+
     lines.extend(_md_entities(picked.get("entity_context", [])))
     lines.append("")
+
     lines.extend(_md_slang(slang_data))
     lines.append("")
 
-    insight_text = narrative.get('insight', '').strip()
     lines.append("## 08 · Insight\n")
-    for p in _split_long_text(insight_text): lines.append(f"{p}\n")
+    for p in _split_long_text(narrative.get('insight', '')): lines.append(f"{p}\n")
 
-    reco_text = narrative.get('rekomendasi', '').strip()
     lines.append("## 09 · Rekomendasi\n")
-    for p in _split_long_text(reco_text): lines.append(f"{p}\n")
+    for p in _split_long_text(narrative.get('rekomendasi', '')): lines.append(f"{p}\n")
 
     lines.append("---\n## Metodologi\n")
     lines.append(f"{_methodology_text(data)}\n")
@@ -257,7 +269,7 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    slang_data = picked.get("slang_raw", [])
+    slang_data = narrative.get("slang_curated", [])
 
     parts: list[str] = []
     parts.append("<!DOCTYPE html>")
@@ -379,14 +391,3 @@ def write_report(data: dict, picked: dict, narrative: dict, meta: dict | None = 
     md_path.write_text(md, encoding="utf-8")
     html_path.write_text(html_str, encoding="utf-8")
     return {"md": str(md_path), "html": str(html_path)}
-
-if __name__ == "__main__":
-    from report.loader import load_all
-    from report.picker import pick_all
-    print("=== TEMPLATE SELF-TEST ===")
-    data = load_all()
-    picked = pick_all(data)
-    narrative = {"headline": "Test", "cerita_utama": "P1\n\nP2", "insight": "Insight.", "rekomendasi": "Reko.", "_meta": {"model": "test", "fallback": True}}
-    paths = write_report(data, picked, narrative)
-    print(f"OK report.md   → {paths['md']}")
-    print(f"OK report.html → {paths['html']}")
