@@ -1,28 +1,52 @@
 """
 report.picker — rule-based selection. TAK panggil LLM.
-
-Tanggungjawab:
-    - pilih top quotes (sentiment ekstrem + diversity)
-    - kumpul entity context (contoh komen per entity)
-    - hantar slang mentah (LLM akan tapis secara organik)
-    - breakdown per topic (sentiment + entity dalam topic)
 """
 
 from __future__ import annotations
-
+import re
 from collections import defaultdict
-
 
 TOP_QUOTES_N     = 5
 ENTITY_CTX_N     = 5
 ENTITY_EX_N      = 2
-SLANG_RAW_N      = 15     # Hantar top 15 ke LLM untuk ditapis
+SLANG_RAW_N      = 15
 TOPIC_BREAK_N    = 5
 QUOTE_MAX_CHARS  = 220
+
+# Heuristic spam filter (bukan hardcode bahasa, tapi tapis iklan/scam)
+SPAM_KEYWORDS = {
+    "pinjaman", "whatsapp", "kripto", "crypto", "buy house", 
+    "investment", "melabur", "scam", "click link", "klik link", "wa.me"
+}
+
+def _is_spam(text: str) -> bool:
+    t_lower = text.lower()
+    # 1. Terlalu panjang (biasanya copy-paste iklan)
+    if len(text) > 300: return True
+    # 2. Terlalu pendek (takde nilai insight)
+    if len(text) < 10: return True
+    # 3. Ada keyword scam/iklan
+    if any(kw in t_lower for kw in SPAM_KEYWORDS): return True
+    # 4. Terlalu banyak HURUF BESAR (shouting)
+    if len(text) > 30:
+        caps = sum(1 for c in text if c.isupper())
+        if caps / len(text) > 0.5: return True
+    return False
 
 def pick_all(data: dict) -> dict:
     summary  = data.get("summary", {})
     comments = data.get("comments", [])
+    
+    # Kira source distribution (dari mana data datang)
+    src_counts = defaultdict(int)
+    for c in comments:
+        src_counts[c.get("source", "unknown")] += 1
+    total_c = len(comments) or 1
+    src_dist = ", ".join(
+        f"{src} ({round(100.0*cnt/total_c, 1)}%)" 
+        for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
+    )
+
     return {
         "top_quotes":      pick_top_quotes(comments, n=TOP_QUOTES_N),
         "entity_context":  pick_entity_context(
@@ -31,21 +55,26 @@ def pick_all(data: dict) -> dict:
                               n=ENTITY_CTX_N,
                               ex=ENTITY_EX_N,
                            ),
-        # Hantar 15 slang mentah. LLM akan tapis dalam generate.py
         "slang_raw":       summary.get("top_slang", [])[:SLANG_RAW_N],
         "topic_breakdown": pick_topic_breakdown(
                               summary,
                               comments,
                               n=TOPIC_BREAK_N,
                            ),
+        "source_dist":     src_dist, # Baru: untuk konteks LLM
     }
 
 def pick_top_quotes(comments: list[dict], n: int = 5) -> list[dict]:
     if not comments: return []
+    
+    # Tapis spam DULU sebelum sort ikut sentiment
     candidates = [
         c for c in comments
-        if c.get("text") and isinstance(c.get("sentiment_score"), (int, float))
+        if c.get("text") 
+        and isinstance(c.get("sentiment_score"), (int, float))
+        and not _is_spam(c["text"])
     ]
+    
     candidates.sort(key=lambda c: abs(c.get("sentiment_score", 0.0)), reverse=True)
 
     picked: list[dict] = []
@@ -61,7 +90,7 @@ def pick_top_quotes(comments: list[dict], n: int = 5) -> list[dict]:
     if len(picked) < n:
         picked_ids = {q["id"] for q in picked}
         for c in candidates:
-            if len(c) >= n: break
+            if len(picked) >= n: break
             if c.get("id") in picked_ids: continue
             picked.append(_quote_shape(c))
     return picked
@@ -93,7 +122,8 @@ def pick_entity_context(top_entities: list[dict], comments: list[dict], n: int =
         count = entry.get("count", 0)
         if not name: continue
 
-        pool = idx.get(name, [])
+        # Tapis spam untuk contoh entity juga
+        pool = [c for c in idx.get(name, []) if not _is_spam(c.get("text", ""))]
         pool_sorted = sorted(
             [c for c in pool if c.get("text")],
             key=lambda c: abs(c.get("sentiment_score", 0.0)),
