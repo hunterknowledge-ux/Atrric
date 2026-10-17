@@ -18,6 +18,9 @@ SPAM_KEYWORDS = {
     "investment", "melabur", "scam", "click link", "klik link", "wa.me"
 }
 
+# Tambah sikit perkataan yang heuristik vokal terlepas
+FILLER_WORDS = {"lah", "bang", "korang", "hahaha", "geng", "pon", "jer", "mmg", "sbb", "skrg"}
+
 def _is_spam(text: str) -> bool:
     t_lower = text.lower()
     if len(text) > 300: return True
@@ -28,20 +31,12 @@ def _is_spam(text: str) -> bool:
         if caps / len(text) > 0.5: return True
     return False
 
-# --- BARU: Heuristik Tapis Shorthand Melayu (Tanpa Hardcode Senarai) ---
 def _is_shorthand(word: str) -> bool:
     w = word.lower().strip()
-    if len(w) < 2: return True # Terlalu pendek
-    if w in ["yg", "tak", "x"]: return False # Exceptions yang bermakna
-    
-    # Kalau tiada langsung huruf vokal (a,e,i,o,u) -> Shorthand
-    if not any(v in w for v in "aeiou"):
-        return True
-        
-    # Kalau 3 huruf dan bukan perkataan biasa (cth: pon, jer, mmg)
-    if len(w) <= 3 and w not in ["aku", "kau", "dia", "apa", "jom", "lah", "kan"]:
-        return True
-        
+    if len(w) < 2: return True
+    if w in FILLER_WORDS: return True # Tapis benda macam 'lah', 'bang'
+    if not any(v in w for v in "aeiou"): return True # Tiada vokal
+    if len(w) <= 3 and w not in ["aku", "kau", "dia", "apa", "jom"]: return True
     return False
 
 def pick_all(data: dict) -> dict:
@@ -57,7 +52,6 @@ def pick_all(data: dict) -> dict:
         for src, cnt in sorted(src_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
-    # Tapis slang mentah menggunakan heuristik Python sebelum hantar ke LLM
     raw_slang = summary.get("top_slang", [])
     clean_slang = [s for s in raw_slang if not _is_shorthand(s["word"])][:SLANG_RAW_N]
 
