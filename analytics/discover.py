@@ -8,32 +8,24 @@ from core.llm import generate_json
 
 _S = json.loads((Path(__file__).parent / "settings.json").read_text())
 
-VERIFY = """You are an expert in Malaysian social media language (Bahasa Melayu + Manglish + Gen-Z).
-
+VERIFY = """You are an expert in Malaysian social media language.
 For each item {word, ctx}, decide ONE of:
-- "entity": proper noun, brand, org, person, country, acronym
-- "slang":  colloquial/code word/non-standard BM/internet slang
-- "normal": ordinary Bahasa Malaysia or English word
+- "entity": proper noun, brand, org, person, country, acronym (e.g. SISPAA, TikTok, KPM)
+- "slang":  colloquial/code word/internet slang (e.g. strawberi, skibidi, rizz, padu, gempak)
+- "normal": ordinary Bahasa Malaysia OR English word (e.g. bayar, cuba, waktu, school, value, then)
 
-IMPORTANT — ordinary BM words are NOT slang, even if frequent:
-atas, bagi, baik, balik, banyak, baru, begitu, beli, ambil, pergi, buat, kata, sudah, boleh, mahu, minta, tengok, dengar, sekolah, kuat, teruk, orang, sini, sana
+IMPORTANT:
+1. Standard BM words are NOT slang. (e.g. bayar, cuba, dengar, terima, sebab, waktu)
+2. Standard English words are NOT slang. (e.g. school, value, then, best, focus)
+3. Read the context. If it's a normal word used normally, return "normal".
 
-REAL slang examples (label these):
-strawberi, acah kuat, skibidi, rizz, delulu, tercekik, padu, gempak, syok, membazir, ceplos, sambung belajar
-
-REAL entity examples (label these):
-SISPAA, TikTok, Shopee, KPM, Anwar, Malaysia, Gen Z, Millennials
-
-Read the context sentence. If the word is ordinary BM in that context -> "normal".
-
-STRICT JSON only: {"entity":["word1","word2"], "slang":["word1","word2"]}
-Return each item as a PLAIN STRING, not an object."""
+STRICT JSON only: {"entity":["word1"], "slang":["word2"]}
+Return PLAIN STRINGS, no objects."""
 
 TOPIC_DISCOVER = """Analyze Malaysian social media comments.
-Propose 10-15 BROAD topic categories (not specific entities).
-Topics must be 1-2 words, lowercase.
-Good: education, social, gov_service, economy, cost_of_living, health
-Bad: sispaa, mental_health, online_classes (too specific)
+Propose 10-15 BROAD topic categories. Must be lowercase, 1-2 words.
+Do NOT use specific entities (e.g. no 'sispaa', no 'haziq').
+Good: education, social, gov_service, economy, health, politics, tech
 STRICT JSON only: {"topics":["topic1","topic2"]}"""
 
 def _coerce(x):
@@ -83,11 +75,14 @@ def _verify(cands, kind, texts):
         pat = re.compile(rf"\b{re.escape(w)}\b", re.I)
         for t in texts:
             for sent in t.split(". "):
-                if pat.search(sent): return sent[:200]
+                if pat.search(sent): return sent[:150] # pendekkan context
         return ""
     items = [{"word": w, "ctx": ctx_for(w)} for w in cands]
     ok = []
-    B = min(_S["llm_batch"], 20)
+    
+    # FIX: Batch size 10 untuk elak truncation
+    B = 10 
+    
     def _do_batch(chunk, tag=""):
         try:
             data = generate_json(json.dumps(chunk, ensure_ascii=False),
@@ -100,16 +95,13 @@ def _verify(cands, kind, texts):
             s = _coerce(x)
             if s: out.append(s)
         return out
+        
     for i in range(0, len(items), B):
         chunk = items[i:i+B]
         res = _do_batch(chunk, f"batch {i}")
         if res is None:
-            print(f"[discover] {kind} batch {i}: parse fail — retry split")
-            half = max(1, len(chunk) // 2)
+            print(f"[discover] {kind} batch {i}: parse fail")
             res = []
-            for j in range(0, len(chunk), half):
-                r2 = _do_batch(chunk[j:j+half], f"batch {i}+{j}")
-                if r2: res.extend(r2)
         ok.extend(res)
         print(f"[discover] {kind} batch {i}: +{len(res)}")
     return ok
@@ -136,7 +128,6 @@ def run(items):
     texts = [i["text"] for i in items]
     print(f"[discover] {len(texts)} teks")
 
-    # Topics
     t_ok = load("topics")
     if t_ok:
         print(f"[discover] topics: {len(t_ok)} existing")
@@ -146,18 +137,16 @@ def run(items):
         if new_t:
             save("topics", new_t)
             print(f"[discover] topics: +{len(new_t)} saved")
-        else:
-            print("[discover] topics: gagal, skip")
 
-    # Entity + slang
     e_c = _cand_entities(texts)
     s_c = _cand_slang(texts)
     print(f"[discover] calon: {len(e_c)} entity, {len(s_c)} slang")
 
     e_ok = set(load("entities")); s_ok = set(load("slang"))
     e_new = [c for c in e_c if c not in e_ok]
-    s_new = [c for c in s_c if c not in s_ok
-             and c.lower() not in {x.lower() for x in e_ok}]
+    # Buang entity dari senarai calon slang
+    e_lower = {x.lower() for x in e_ok}
+    s_new = [c for c in s_c if c not in s_ok and c.lower() not in e_lower]
 
     print(f"[discover] sahkan via LLM: {len(e_new)} + {len(s_new)}")
     new_e = _verify(e_new, "entity", texts)
