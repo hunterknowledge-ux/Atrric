@@ -13,13 +13,25 @@ OUT_DIR = Path(__file__).resolve().parent / "out"
 DEFAULT_PREPARED_FOR = "B2B Client"
 DEFAULT_BRAND_TAG = "Market Intelligence"
 
-SECTIONS = [
+# Kita tak letak nombor hardcode kat sini. Nombor akan dijana automatik.
+BASE_SECTIONS = [
     ("s01", "Ringkasan Eksekutif"), ("s02", "Snapshot Data"),
     ("s03", "Cerita Utama"), ("s04", "Suara Responden"),
     ("s05", "Topik Trending"), ("s06", "Entiti Utama"),
-    ("s07", "Bahasa & Slang"), ("s08", "Insight"),
-    ("s09", "Rekomendasi"),
+    ("s08", "Insight"), ("s09", "Rekomendasi"),
 ]
+
+def _get_dynamic_sections(picked: dict) -> list[tuple[str, str]]:
+    """Bina TOC secara dinamik. Kalau takde slang, skip Section 07."""
+    sections = []
+    slang_data = picked.get("slang_raw", [])
+    
+    for sid, title in BASE_SECTIONS:
+        if sid == "s08" and slang_data:
+            sections.append(("s07", "Bahasa & Slang"))
+        sections.append((sid, title))
+        
+    return sections
 
 def _default_report_id() -> str:
     return "ATRRIC-" + datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -75,12 +87,8 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     total = summary.get("total_comments", 0)
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
-    
-    # Guna slang dari Python (yang dah ditapis guna NLP Stopwords)
     slang_data = picked.get("slang_raw", [])
-    
-    # Guna quotes dari picker (yang dah ditapis spam)
-    final_quotes = picked.get("top_quotes", [])
+    sections = _get_dynamic_sections(picked)
 
     lines.append("# ATRRIC · Market Intelligence\n\n**CONFIDENTIAL**\n")
     lines.append("| | |\n|---|---|")
@@ -93,34 +101,41 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     lines.append(f"> *{narrative.get('headline', '')}*\n")
 
     lines.append("### Kandungan\n")
-    for i, (_, title) in enumerate(SECTIONS, start=1): lines.append(f"{i}. {title}")
+    for i, (_, title) in enumerate(sections, start=1): lines.append(f"{i}. {title}")
     lines.append("")
 
-    lines.append("## 01 · Ringkasan Eksekutif\n")
+    # Auto-numbering untuk markdown
+    def sec_num(sid):
+        for i, (s, _) in enumerate(sections, start=1):
+            if s == sid: return f"{i:02d}"
+        return ""
+
+    lines.append(f"## {sec_num('s01')} · Ringkasan Eksekutif\n")
     lines.append(f"> {exec_text}\n" if exec_text else "_(tiada ringkasan)_\n")
 
-    lines.extend(_md_snapshot(summary))
+    lines.extend(_md_snapshot(summary, sec_num('s02')))
     lines.append("")
 
-    lines.append("## 03 · Cerita Utama\n")
+    lines.append(f"## {sec_num('s03')} · Cerita Utama\n")
     for p in body_paras: lines.append(f"{p}\n")
 
-    lines.extend(_md_quotes(final_quotes))
+    lines.extend(_md_quotes(picked.get("top_quotes", []), sec_num('s04')))
     lines.append("")
 
-    lines.extend(_md_topics(picked.get("topic_breakdown", [])))
+    lines.extend(_md_topics(picked.get("topic_breakdown", []), sec_num('s05')))
     lines.append("")
 
-    lines.extend(_md_entities(picked.get("entity_context", [])))
+    lines.extend(_md_entities(picked.get("entity_context", []), sec_num('s06')))
     lines.append("")
 
-    lines.extend(_md_slang(slang_data))
-    lines.append("")
+    if slang_data:
+        lines.extend(_md_slang(slang_data, sec_num('s07')))
+        lines.append("")
 
-    lines.append("## 08 · Insight\n")
+    lines.append(f"## {sec_num('s08')} · Insight\n")
     for p in _split_long_text(narrative.get('insight', '')): lines.append(f"{p}\n")
 
-    lines.append("## 09 · Rekomendasi\n")
+    lines.append(f"## {sec_num('s09')} · Rekomendasi\n")
     for p in _split_long_text(narrative.get('rekomendasi', '')): lines.append(f"{p}\n")
 
     lines.append("---\n## Metodologi\n")
@@ -137,24 +152,24 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
 
     return "\n".join(lines)
 
-def _md_snapshot(summary: dict) -> list[str]:
+def _md_snapshot(summary: dict, sec_str: str) -> list[str]:
     total = summary.get("total_comments", 0)
     by_sent = summary.get("by_sentiment", {})
     pos, neg, neu = by_sent.get("positive", 0), by_sent.get("negative", 0), by_sent.get("neutral", 0)
     by_topic = summary.get("by_topic", {})
     top_topic = max(by_topic.items(), key=lambda kv: kv[1])[0] if by_topic else "-"
     def pct(n: int) -> str: return f"{round(100.0 * n / total, 1)}%" if total else "0%"
-    return ["## 02 · Snapshot Data\n", f"- **Total komen dianalisis**: {total}", f"- **Topik dominan**: {top_topic}", f"- **Sentiment**: {neg} negatif ({pct(neg)}) · {pos} positif ({pct(pos)}) · {neu} neutral ({pct(neu)})"]
+    return [f"## {sec_str} · Snapshot Data\n", f"- **Total komen dianalisis**: {total}", f"- **Topik dominan**: {top_topic}", f"- **Sentiment**: {neg} negatif ({pct(neg)}) · {pos} positif ({pct(pos)}) · {neu} neutral ({pct(neu)})"]
 
-def _md_quotes(quotes: list[dict]) -> list[str]:
-    if not quotes: return ["## 04 · Suara Responden\n", "_(tiada quote tersedia)_"]
-    out = ["## 04 · Suara Responden\n"]
+def _md_quotes(quotes: list[dict], sec_str: str) -> list[str]:
+    if not quotes: return [f"## {sec_str} · Suara Responden\n", "_(tiada quote tersedia)_"]
+    out = [f"## {sec_str} · Suara Responden\n"]
     for q in quotes: out.append(f"> {q['text']}\n> — *[{q['topic']} · {q['sentiment']}]*\n")
     return out
 
-def _md_topics(breakdown: list[dict]) -> list[str]:
-    if not breakdown: return ["## 05 · Topik Trending\n", "_(tiada data)_"]
-    out = ["## 05 · Topik Trending\n"]
+def _md_topics(breakdown: list[dict], sec_str: str) -> list[str]:
+    if not breakdown: return [f"## {sec_str} · Topik Trending\n", "_(tiada data)_"]
+    out = [f"## {sec_str} · Topik Trending\n"]
     for tb in breakdown:
         s = tb["sentiment"]
         entities = ", ".join(tb.get("top_entities", [])) or "-"
@@ -163,17 +178,17 @@ def _md_topics(breakdown: list[dict]) -> list[str]:
         out.append(f"Entities: `{entities}`\n")
     return out
 
-def _md_entities(entities: list[dict]) -> list[str]:
-    if not entities: return ["## 06 · Entiti Utama\n", "_(tiada data)_"]
-    out = ["## 06 · Entiti Utama\n"]
+def _md_entities(entities: list[dict], sec_str: str) -> list[str]:
+    if not entities: return [f"## {sec_str} · Entiti Utama\n", "_(tiada data)_"]
+    out = [f"## {sec_str} · Entiti Utama\n"]
     for e in entities:
         out.append(f"### {e['name']} — {e['count']} sebutan\n")
         for ex in e.get("examples", []): out.append(f"> {ex}\n")
     return out
 
-def _md_slang(slang: list[dict]) -> list[str]:
-    if not slang: return ["## 07 · Bahasa & Slang\n", "_(tiada slang signifikan)_"]
-    out = ["## 07 · Bahasa & Slang\n", "Signature bahasa Gen Z dalam dataset ni:\n"]
+def _md_slang(slang: list[dict], sec_str: str) -> list[str]:
+    if not slang: return []
+    out = [f"## {sec_str} · Bahasa & Slang\n", "Signature bahasa Gen Z dalam dataset ni:\n"]
     for s in slang: out.append(f"- **{s['word']}** ({s['count']}x) — {s.get('note', 'slanga Gen Z')}")
     return out
 
@@ -269,7 +284,12 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
 
     exec_text, body_paras = _split_exec_summary(narrative.get("cerita_utama", ""))
     slang_data = picked.get("slang_raw", [])
-    final_quotes = picked.get("top_quotes", [])
+    sections = _get_dynamic_sections(picked)
+
+    def sec_num(sid):
+        for i, (s, _) in enumerate(sections, start=1):
+            if s == sid: return f"{i:02d}"
+        return ""
 
     parts: list[str] = []
     parts.append("<!DOCTYPE html>")
@@ -291,44 +311,45 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     parts.append(f'<p class="lede">{esc(narrative.get("headline", ""))}</p>')
 
     parts.append('<nav class="toc"><div class="toc-title">Kandungan</div><ol>')
-    for sid, title in SECTIONS: parts.append(f'<li><a href="#{sid}">{esc(title)}</a></li>')
+    for sid, title in sections: parts.append(f'<li><a href="#{sid}">{esc(title)}</a></li>')
     parts.append("</ol></nav>")
 
-    parts.append('<section class="exec-summary" id="s01"><h2><span class="sec-num">01</span>Ringkasan Eksekutif</h2><div class="callout">')
+    parts.append(f'<section class="exec-summary" id="s01"><h2><span class="sec-num">{sec_num("s01")}</span>Ringkasan Eksekutif</h2><div class="callout">')
     parts.append(f"<p>{esc(exec_text)}</p>" if exec_text else "<p><i>(tiada ringkasan)</i></p>")
     parts.append("</div></section>")
 
-    parts.append('<section id="s02"><h2><span class="sec-num">02</span>Snapshot Data</h2>')
+    parts.append(f'<section id="s02"><h2><span class="sec-num">{sec_num("s02")}</span>Snapshot Data</h2>')
     parts.append(_html_snapshot(summary))
     parts.append("</section>")
 
-    parts.append('<section id="s03"><h2><span class="sec-num">03</span>Cerita Utama</h2>')
+    parts.append(f'<section id="s03"><h2><span class="sec-num">{sec_num("s03")}</span>Cerita Utama</h2>')
     if body_paras:
         for p in body_paras: parts.append(f"<p>{esc(p)}</p>")
     else: parts.append("<p><i>(tiada naratif)</i></p>")
     parts.append("</section>")
 
-    parts.append('<section id="s04"><h2><span class="sec-num">04</span>Suara Responden</h2>')
-    parts.append(_html_quotes(final_quotes))
+    parts.append(f'<section id="s04"><h2><span class="sec-num">{sec_num("s04")}</span>Suara Responden</h2>')
+    parts.append(_html_quotes(picked.get("top_quotes", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s05"><h2><span class="sec-num">05</span>Topik Trending</h2>')
+    parts.append(f'<section id="s05"><h2><span class="sec-num">{sec_num("s05")}</span>Topik Trending</h2>')
     parts.append(_html_topics(picked.get("topic_breakdown", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s06"><h2><span class="sec-num">06</span>Entiti Utama</h2>')
+    parts.append(f'<section id="s06"><h2><span class="sec-num">{sec_num("s06")}</span>Entiti Utama</h2>')
     parts.append(_html_entities(picked.get("entity_context", [])))
     parts.append("</section>")
 
-    parts.append('<section id="s07"><h2><span class="sec-num">07</span>Bahasa &amp; Slang</h2>')
-    parts.append(_html_slang(slang_data))
-    parts.append("</section>")
+    if slang_data:
+        parts.append(f'<section id="s07"><h2><span class="sec-num">{sec_num("s07")}</span>Bahasa &amp; Slang</h2>')
+        parts.append(_html_slang(slang_data))
+        parts.append("</section>")
 
-    parts.append('<section id="s08"><h2><span class="sec-num">08</span>Insight</h2>')
+    parts.append(f'<section id="s08"><h2><span class="sec-num">{sec_num("s08")}</span>Insight</h2>')
     for p in _split_long_text(narrative.get("insight", "")): parts.append(f"<p>{esc(p)}</p>")
     parts.append("</section>")
 
-    parts.append('<section id="s09"><h2><span class="sec-num">09</span>Rekomendasi</h2>')
+    parts.append(f'<section id="s09"><h2><span class="sec-num">{sec_num("s09")}</span>Rekomendasi</h2>')
     for p in _split_long_text(narrative.get("rekomendasi", "")): parts.append(f"<p>{esc(p)}</p>")
     parts.append("</section>")
 
@@ -377,7 +398,7 @@ def _html_entities(entities: list[dict]) -> str:
     return "\n".join(out)
 
 def _html_slang(slang: list[dict]) -> str:
-    if not slang: return "<p><i>(tiada slang signifikan)</i></p>"
+    if not slang: return ""
     out = ['<ul class="slang-list">']
     for s in slang: out.append(f'<li><span class="slang-word">{html.escape(s["word"])}</span> <span>({s["count"]}x) — {html.escape(s.get("note", "slanga Gen Z"))}</span></li>')
     out.append("</ul>")
