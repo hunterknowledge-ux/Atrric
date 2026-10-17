@@ -1,5 +1,5 @@
 """
-report.generate — 2 LLM calls: 1 untuk naratif, 1 untuk tapis kualiti (slang + quotes).
+report.generate — 2 LLM calls: 1 untuk naratif, 1 untuk tapis kualiti.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ PERATURAN KETAT:
 
 FILTER_SYSTEM_PROMPT = """\
 Kau adalah Editor Kualiti Kanan.
-Tugas kau ada 2:
-1. TAPIS SLANG: Buang singkatan Melayu (utk, sbb), partikel (lah, pon), dan bahasa pasar (gila, hahaha). KEKALKAN HANYA slang budaya Gen Z sebenar (ceplos, red flag, dll).
+Tugas kau:
+1. TAPIS SLANG: Buang singkatan Melayu (utk, sbb), partikel (lah, pon), dan bahasa pasar (gila, hahaha). KEKALKAN HANYA slang budaya Gen Z sebenar (ceplos, red flag, dll). JANGAN masukkan perkataan yang kau nak buang ke dalam JSON.
 2. TAPIS QUOTE: Buang quote yang nampak macam iklan/spam (contoh: tawaran pinjaman, kripto, beli rumah). Pilih 5 quote terbaik yang paling ikhlas mewakili suara manusia.
 
 Output MESTI JSON sahaja dengan format:
@@ -80,7 +80,7 @@ def _fallback(summary: dict, picked: dict) -> dict:
         "insight": "Analisis kualitatif tidak tersedia. Sila rujuk snapshot angka untuk gambaran kuantitatif.",
         "rekomendasi": "Jalankan semula report layer apabila LLM API kembali tersedia.",
         "slang_curated": [],
-        "quotes_curated": [q["id"] for q in picked.get("top_quotes", [])[:5]] # Fallback ke quote asal
+        "quotes_curated": [q["id"] for q in picked.get("top_quotes", [])[:5]]
     }
 
 def generate_narrative(data: dict, picked: dict, model: str | None = None) -> dict:
@@ -119,10 +119,17 @@ def generate_narrative(data: dict, picked: dict, model: str | None = None) -> di
 
     try:
         raw_filter = generate_json(**slang_kwargs)
-        slang_curated = raw_filter.get("slang_curated", []) if isinstance(raw_filter, dict) else []
-        quotes_curated = raw_filter.get("quotes_curated", []) if isinstance(raw_filter, dict) else []
         
-        # Pastikan quotes_curated ada 5. Kalau tak cukup, fallback.
+        # --- THE PYTHON HACK (Untuk pastikan takde slang sampah terlepas) ---
+        raw_slang = raw_filter.get("slang_curated", []) if isinstance(raw_filter, dict) else []
+        slang_curated = []
+        for s in raw_slang:
+            note = s.get("note", "").lower()
+            if "buang" in note or "pasar" in note or "singkatan" in note:
+                continue # Skip kalau LLM sendiri cakap benda tu sampah
+            slang_curated.append(s)
+
+        quotes_curated = raw_filter.get("quotes_curated", []) if isinstance(raw_filter, dict) else []
         if not isinstance(quotes_curated, list) or len(quotes_curated) < 3:
             quotes_curated = [{"id": q["id"]} for q in picked.get("top_quotes", [])[:5]]
     except Exception:
