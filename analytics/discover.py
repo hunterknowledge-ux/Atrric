@@ -16,10 +16,10 @@ For each item {word, ctx}, decide ONE of:
 - "normal": ordinary Bahasa Malaysia or English word
 
 IMPORTANT — ordinary BM words are NOT slang, even if frequent:
-atas, bagi, baik, balik, banyak, baru, begitu, beli, ambil, pergi, buat, kata, sudah, boleh, mahu, minta, tengok, dengar
+atas, bagi, baik, balik, banyak, baru, begitu, beli, ambil, pergi, buat, kata, sudah, boleh, mahu, minta, tengok, dengar, sekolah, kuat, teruk, orang, sini, sana
 
 REAL slang examples (label these):
-strawberi, acah kuat, skibidi, rizz, delulu, tercekik, padu, gempak, syok, membazir
+strawberi, acah kuat, skibidi, rizz, delulu, tercekik, padu, gempak, syok, membazir, ceplos, sambung belajar
 
 REAL entity examples (label these):
 SISPAA, TikTok, Shopee, KPM, Anwar, Malaysia, Gen Z, Millennials
@@ -29,11 +29,12 @@ Read the context sentence. If the word is ordinary BM in that context -> "normal
 STRICT JSON only: {"entity":["word1","word2"], "slang":["word1","word2"]}
 Return each item as a PLAIN STRING, not an object."""
 
-TOPIC_DISCOVER = """You analyze Malaysian social media comments (BM + English + Manglish).
-Propose 10-15 SHORT topic categories that best capture the themes.
-Topics should be lowercase, 1-2 words, snake_case if needed.
-Good examples: education, social, gov_service, economy, cost_of_living, health
-Return STRICT JSON only: {"topics":["topic1","topic2"]}"""
+TOPIC_DISCOVER = """Analyze Malaysian social media comments.
+Propose 10-15 BROAD topic categories (not specific entities).
+Topics must be 1-2 words, lowercase.
+Good: education, social, gov_service, economy, cost_of_living, health
+Bad: sispaa, mental_health, online_classes (too specific)
+STRICT JSON only: {"topics":["topic1","topic2"]}"""
 
 def _coerce(x):
     if x is None: return None
@@ -48,18 +49,16 @@ def _coerce(x):
         return str(v).strip() if v is not None else None
     return str(x).strip() or None
 
-def _discover_topics(texts, sample_n=60):
+def _discover_topics(texts):
     if not texts: return []
-    sample = [t[:300] for t in texts[:sample_n]]
+    sample = [t[:300] for t in texts[:60]]
     try:
-        data = generate_json(
-            "Comments:\n" + "\n".join(f"- {t}" for t in sample),
-            system=TOPIC_DISCOVER, max_tokens=600)
+        data = generate_json("Comments:\n" + "\n".join(f"- {t}" for t in sample),
+                             system=TOPIC_DISCOVER, max_tokens=600)
     except Exception as e:
         print(f"[discover] topic error: {e}"); return []
     if not data: return []
-    got = data.get("topics", [])
-    return sorted({str(t).strip().lower() for t in got if t})
+    return sorted({str(t).strip().lower() for t in data.get("topics", []) if t})
 
 def _cand_entities(texts):
     c = Counter()
