@@ -1,17 +1,30 @@
+from .store import load as load_discovered
 from core.llm import generate_json
 
-SYS = """Analyze one Malaysian social media comment.
+_SYS_CACHE = None
+
+def _build_sys():
+    global _SYS_CACHE
+    if _SYS_CACHE is not None:
+        return _SYS_CACHE
+    topics = load_discovered("topics")
+    if topics:
+        topic_line = f"- topic: ONE from this list -> {', '.join(topics)}"
+    else:
+        topic_line = '- topic: short label (e.g. "education","economy","social")'
+    _SYS_CACHE = f"""Analyze one Malaysian social media comment.
 Return STRICT JSON with keys:
-- topic: short label (e.g. "education","economy","social","gov_service")
+{topic_line}
 - sentiment: "positive"|"negative"|"neutral"
 - sentiment_score: float -1.0 to 1.0
 - entities: list of proper nouns/brands/orgs/acronyms mentioned
 - slang: list of colloquial/code words used
 Return ONLY JSON, no markdown."""
+    return _SYS_CACHE
 
 def one(text):
     try:
-        d = generate_json(text[:800], system=SYS, max_tokens=500)
+        d = generate_json(text[:800], system=_build_sys(), max_tokens=500)
     except Exception as e:
         print(f"[extract] error: {type(e).__name__}: {e}")
         d = None
