@@ -23,10 +23,13 @@ IMPORTANT:
 STRICT JSON only: {"entity":["word1"], "slang":["word2"]}"""
 
 TOPIC_DISCOVER = """Analyze Malaysian social media comments.
-Propose 10-15 BROAD topic categories. Lowercase, 1-2 words.
-Do NOT use specific entities.
-Good: education, social, gov_service, economy, health
-STRICT JSON only: {"topics":["topic1","topic2"]}"""
+The existing topics we already have are: {existing}
+
+Propose 3-5 NEW broad topic categories that are NOT in the existing list but are highly relevant to these comments.
+Must be lowercase, 1-2 words, snake_case if needed.
+Do NOT use specific entities or names.
+
+STRICT JSON only: {"topics":["new_topic1","new_topic2"]}"""
 
 def _coerce(x):
     if x is None: return None
@@ -41,17 +44,24 @@ def _coerce(x):
         return str(v).strip() if v is not None else None
     return str(x).strip() or None
 
-def _discover_topics(texts):
+def _discover_topics(texts, existing_topics):
     if not texts: return []
     sample = [t[:300] for t in texts[:60]]
+    existing_str = ", ".join(existing_topics) if existing_topics else "none"
+    
+    sys_prompt = TOPIC_DISCOVER.replace("{existing}", existing_str)
+    
     try:
         time.sleep(1.5)
         data = generate_json("Comments:\n" + "\n".join(f"- {t}" for t in sample),
-                             system=TOPIC_DISCOVER, max_tokens=600, task="discover")
+                             system=sys_prompt, max_tokens=600, task="discover")
     except Exception as e:
         print(f"[discover] topic error: {e}"); return []
     if not data: return []
-    return sorted({str(t).strip().lower() for t in data.get("topics", []) if t})
+    
+    # Hanya ambil topik yang belum ada dalam senarai lama
+    new_topics = {str(t).strip().lower() for t in data.get("topics", []) if t}
+    return sorted(new_topics - set(existing_topics))
 
 def _cand_entities(texts):
     c = Counter()
@@ -126,16 +136,19 @@ def run(items):
     texts = [i["text"] for i in items]
     print(f"[discover] {len(texts)} teks")
 
-    t_ok = load("topics")
-    if t_ok:
-        print(f"[discover] topics: {len(t_ok)} existing")
+    # --- TOPIC DISCOVERY (Automatic Merge) ---
+    existing_topics = load("topics")
+    print(f"[discover] Semak topik baru (sedia ada: {len(existing_topics)})...")
+    
+    new_topics = _discover_topics(texts, existing_topics)
+    if new_topics:
+        merged_topics = sorted(list(set(existing_topics) | set(new_topics)))
+        save("topics", merged_topics)
+        print(f"[discover] ✅ +{len(new_topics)} topik baru ditambah. Total: {len(merged_topics)}")
     else:
-        print("[discover] discovering topics...")
-        new_t = _discover_topics(texts)
-        if new_t:
-            save("topics", new_t)
-            print(f"[discover] topics: +{len(new_t)} saved")
+        print("[discover] Tiada topik baru ditemui.")
 
+    # --- ENTITY & SLANG DISCOVERY ---
     e_c = _cand_entities(texts)
     s_c = _cand_slang(texts)
     print(f"[discover] calon: {len(e_c)} entity, {len(s_c)} slang")
