@@ -1,25 +1,33 @@
 """
-report.generate — 1 LLM call untuk naratif utama.
+report.generate — 2 LLM calls: 1 untuk naratif, 1 untuk tapis slang.
 """
 
 from __future__ import annotations
 import json
 from typing import Any
 
-SYSTEM_PROMPT = """\
+NARRATIVE_SYSTEM_PROMPT = """\
 Kau adalah Senior Market Intelligence Analyst untuk Gen Z Malaysia.
 Tugas kau adalah membedah data dan menghasilkan insight tajam untuk agensi B2B.
 
 PERATURAN KETAT:
-1. JANGAN guna ayat klise/generik (contoh terlarang: "tekanan ekonomi", "perlu pendekatan empati").
-2. Setiap Insight dan Rekomendasi MESTI merujuk kepada sekurang-kurangnya SATU entiti spesifik (cth: PTPTN, HAZIQ) dan SATU angka dari data.
-3. Bagi konteks kepada entiti. Cakap KENAPA ia disebut (cth: "HAZIQ dipuji kerana...").
-4. JANGAN guna bullet point dalam naratif. Tulis perenggan padu.
-5. PENTING: Setiap perenggan dalam "cerita_utama" MESTI dipisah dengan \\n\\n.
-6. Output MESTI JSON sahaja, tiada teks lain di luar JSON.
+1. JANGAN guna ayat klise/generik (contoh: "tekanan ekonomi", "perlu pendekatan empati").
+2. Setiap Insight dan Rekomendasi MESTI merujuk kepada sekurang-kurangnya SATU entiti spesifik dan SATU angka dari data.
+3. Bagi konteks kepada entiti. Cakap KENAPA ia disebut.
+4. Tulis perenggan padu. JANGAN guna bullet point.
+5. PENTING: Setiap perenggan MESTI dipisah dengan \\n\\n.
+6. Output MESTI JSON sahaja.
 """
 
-def _build_prompt(summary: dict, picked: dict, comments_count: int) -> str:
+SLANG_SYSTEM_PROMPT = """\
+Kau adalah pakar linguistik Gen Z Malaysia.
+Tugas kau: Tapis senarai perkataan yang diberi. 
+Buang singkatan Melayu (cth: utk, sbb, mmg), partikel (lah, pon, jer), dan perkataan pasar harian (gila, dorang, hahaha).
+KEKALKAN HANYA slang budaya Gen Z sebenar yang bernilai (cth: ceplos, sambung belajar, red flag, toxic).
+Return ONLY a valid JSON array of objects. Example: [{"word": "ceplos", "count": 8, "note": "gagal"}]
+"""
+
+def _build_narrative_prompt(summary: dict, picked: dict, comments_count: int) -> str:
     top_ent = ", ".join(f"{e['name']}({e['count']})" for e in summary.get("top_entities", [])[:8])
     by_sent = summary.get("by_sentiment", {})
     by_topic = summary.get("by_topic", {})
@@ -64,13 +72,12 @@ def _fallback(summary: dict, picked: dict) -> dict:
         "cerita_utama": f"Analisis {total} komen dari pelbagai platform menunjukkan dominasi sentiment negatif ({pct}%).\n\n(Naratif penuh tidak dapat dijana oleh LLM pada masa ini. Bahagian angka di bawah masih boleh dirujuk.)",
         "insight": "Analisis kualitatif tidak tersedia. Sila rujuk snapshot angka untuk gambaran kuantitatif.",
         "rekomendasi": "Jalankan semula report layer apabila LLM API kembali tersedia.",
+        "slang_curated": []
     }
 
 def generate_narrative(data: dict, picked: dict, model: str | None = None) -> dict:
     summary = data.get("summary", {})
     comments_count = data.get("meta", {}).get("total_loaded", 0)
-
-    prompt = _build_prompt(summary, picked, comments_count)
 
     try:
         from core.llm import generate_json
@@ -79,35 +86,46 @@ def generate_narrative(data: dict, picked: dict, model: str | None = None) -> di
         result["_meta"] = {"model": "fallback", "reason": f"import error: {e}", "fallback": True}
         return result
 
-    kwargs: dict[str, Any] = {
-        "prompt": prompt,
-        "system": SYSTEM_PROMPT,
-        "max_tokens": 1500,
-        "task": "report"
-    }
+    # --- CALL 1: Narrative ---
+    prompt = _build_narrative_prompt(summary, picked, comments_count)
+    kwargs: dict[str, Any] = {"prompt": prompt, "system": NARRATIVE_SYSTEM_PROMPT, "max_tokens": 1500, "task": "report"}
     if model: kwargs["model"] = model
 
     try:
-        raw = generate_json(**kwargs)
+        raw_narrative = generate_json(**kwargs)
     except Exception as e:
         result = _fallback(summary, picked)
         result["_meta"] = {"model": "fallback", "reason": f"llm error: {e}", "fallback": True}
         return result
 
-    # KITA TAK LAGI REQUIRED 'slang_curated' DARI LLM
     required = ("headline", "cerita_utama", "insight", "rekomendasi")
-    if not isinstance(raw, dict) or not all(k in raw for k in required):
+    if not isinstance(raw_narrative, dict) or not all(k in raw_narrative for k in required):
         result = _fallback(summary, picked)
         result["_meta"] = {"model": "fallback", "reason": "invalid LLM response shape", "fallback": True}
         return result
 
-    tokens_in_est = len(prompt) // 4
-    tokens_out_est = sum(len(str(raw[k])) for k in required) // 4
+    # --- CALL 2: Slang Filter ---
+    slang_input = json.dumps(picked.get("slang_raw", []), ensure_ascii=False)
+    slang_prompt = f"Senarai perkataan: {slang_input}"
+    slang_kwargs = {"prompt": slang_prompt, "system": SLANG_SYSTEM_PROMPT, "max_tokens": 400, "task": "report"}
+    if model: slang_kwargs["model"] = model
 
-    raw["_meta"] = {
+    try:
+        raw_slang = generate_json(**slang_kwargs)
+        # Pastikan ia list of dicts
+        if isinstance(raw_slang, list):
+            slang_curated = raw_slang
+        else:
+            slang_curated = []
+    except Exception:
+        # Kalau tapis slang fail, kita bagi kosong je dari tunjuk sampah
+        slang_curated = []
+
+    raw_narrative["slang_curated"] = slang_curated
+    raw_narrative["_meta"] = {
         "model": model or "default (router)",
-        "tokens_in_est": tokens_in_est,
-        "tokens_out_est": tokens_out_est,
+        "tokens_in_est": (len(prompt) + len(slang_prompt)) // 4,
+        "tokens_out_est": (sum(len(str(raw_narrative[k])) for k in required) + sum(len(str(s)) for s in slang_curated)) // 4,
         "fallback": False,
     }
-    return raw
+    return raw_narrative
