@@ -22,12 +22,13 @@ import feedparser
 # KONFIGURASI
 # ==========================================
 
-# URL RSS yang dah dikemaskini (Buang Bernama & Sinar Harian yang rosak)
+# URL RSS yang dikemaskini (Guna WordPress feed - XML confirm bersih)
 RSS_FEEDS: Dict[str, str] = {
-    "fmt": "https://www.freemalaysiatoday.com/feed/",
-    "astro_awani": "https://www.astroawani.com/rss/berita",
-    "malaymail": "https://www.malaymail.com/feed",
-    "thestar": "https://www.thestar.com.my/rss/News/Nation",
+    "fmt_en": "https://www.freemalaysiatoday.com/feed/",
+    "fmt_bm": "https://www.freemalaysiatoday.com/category/bahasa/feed/",
+    "soyacincau": "https://soyacincau.com/feed/",
+    "cilisos": "https://cilisos.my/feed/",
+    "lobakmerah": "https://lobakmerah.com/feed/",
 }
 
 # Gatekeeper Keywords
@@ -159,7 +160,7 @@ def fetch_feed(source: str, url: str) -> int:
 
 def main() -> None:
     print("=" * 60)
-    print("ATRRIC NEWS AUTO-FETCHER (v1.2 - Stealth Mode)")
+    print("ATRRIC NEWS AUTO-FETCHER (v1.3 - Stable Feeds)")
     print("=" * 60)
 
     total_saved = 0
