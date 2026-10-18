@@ -1,0 +1,10 @@
+---
+source: fmt_bm
+url: https://www.freemalaysiatoday.com/category/bahasa/tempatan/2026/10/17/sekolah-institusi-pendidikan-johor-tutup-5-hari-lagi
+published_date: 2026-10-17
+scraped_at: 2026-10-18 11:20:12
+---
+[Title] Sekolah, institusi pendidikan Johor tutup 5 hari lagi
+
+[Text]
+Exco Pendidikan Johor, Naqib Md Ghazali berkata penutupan itu tertakluk pada perkembangan tahap kualiti udara, ramalan cuaca serta penilaian kesihatan semasa.
