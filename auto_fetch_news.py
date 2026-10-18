@@ -22,12 +22,12 @@ import feedparser
 # KONFIGURASI
 # ==========================================
 
-# Senarai RSS Sumber
+# URL RSS yang dah dikemaskini (Buang Bernama & Sinar Harian yang rosak)
 RSS_FEEDS: Dict[str, str] = {
     "fmt": "https://www.freemalaysiatoday.com/feed/",
-    "bernama": "https://www.bernama.com/rss/en/news.php",
-    "sinarharian": "https://www.sinarharian.com.my/rss/national",
+    "astro_awani": "https://www.astroawani.com/rss/berita",
     "malaymail": "https://www.malaymail.com/feed",
+    "thestar": "https://www.thestar.com.my/rss/News/Nation",
 }
 
 # Gatekeeper Keywords
@@ -70,14 +70,13 @@ def sanitize_filename(title: str, max_length: int = 50) -> str:
 
 def save_article(source: str, url: str, title: str, text: str, pub_date: str, scraped_at: str) -> None:
     """Simpan artikel ke folder harian berdasarkan tarikh terbit."""
-    # Folder ikut tarikh terbit (contoh: raw_data/news/2026-10-18/)
     daily_dir = RAW_NEWS_DIR / pub_date
     daily_dir.mkdir(parents=True, exist_ok=True)
     
     filename = sanitize_filename(title) + ".txt"
     filepath = daily_dir / filename
 
-    # Idempotent: Kalau dah wujud (same title & date), skip
+    # Idempotent: Kalau dah wujud, skip
     if filepath.exists():
         return
 
@@ -104,7 +103,10 @@ def fetch_feed(source: str, url: str) -> int:
     print(f"  [{source.upper()}] Menarik data...")
 
     try:
-        feed = feedparser.parse(url)
+        # User-Agent palsu (supaya tak nampak macam bot Python)
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        
+        feed = feedparser.parse(url, agent=user_agent)
         
         if feed.bozo and not feed.entries:
             print(f"    [!] Gagal parse RSS: {feed.bozo_exception}")
@@ -113,7 +115,6 @@ def fetch_feed(source: str, url: str) -> int:
         total_entries = len(feed.entries)
         print(f"    Ditemui {total_entries} artikel.")
 
-        # Tarikh hari ni (fallback jika RSS tak bagi tarikh)
         now_date = datetime.now().strftime("%Y-%m-%d")
         scraped_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -133,15 +134,12 @@ def fetch_feed(source: str, url: str) -> int:
             if len(clean_text) < 150:
                 continue
 
-            # 3. Dapatkan Tarikh Terbit (Published Date)
-            # feedparser simpan tarikh dalam published_parsed atau updated_parsed
+            # 3. Tarikh Terbit
             pub_date_struct = entry.get("published_parsed") or entry.get("updated_parsed")
             
             if pub_date_struct:
-                # Tukar struct_time ke string YYYY-MM-DD
                 pub_date = time.strftime("%Y-%m-%d", pub_date_struct)
             else:
-                # Kalau RSS tak bagi tarikh, guna tarikh hari ni
                 pub_date = now_date
 
             # 4. Simpan
@@ -161,7 +159,7 @@ def fetch_feed(source: str, url: str) -> int:
 
 def main() -> None:
     print("=" * 60)
-    print("ATRRIC NEWS AUTO-FETCHER (v1.1 - Time-Series)")
+    print("ATRRIC NEWS AUTO-FETCHER (v1.2 - Stealth Mode)")
     print("=" * 60)
 
     total_saved = 0
