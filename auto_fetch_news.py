@@ -22,25 +22,30 @@ import feedparser
 # KONFIGURASI
 # ==========================================
 
-# URL RSS yang dikemaskini (Guna WordPress feed - XML confirm bersih)
 RSS_FEEDS: Dict[str, str] = {
-    "fmt_en": "https://www.freemalaysiatoday.com/feed/",
     "fmt_bm": "https://www.freemalaysiatoday.com/category/bahasa/feed/",
     "soyacincau": "https://soyacincau.com/feed/",
     "cilisos": "https://cilisos.my/feed/",
     "lobakmerah": "https://lobakmerah.com/feed/",
 }
 
-# Gatekeeper Keywords
+# 1. ENTITY: Siapa yang kita cari?
 ENTITY_KEYWORDS: List[str] = [
     "gen z", "belia", "pelajar", "graduan", "fresh grad", 
-    "anak muda", "universiti", "sekolah", "remaja", "ipt"
+    "anak muda", "universiti", "sekolah", "remaja", "ipt",
+    "gen-z", "mahasiswa", "lepasan spm"
 ]
 
+# 2. TOPIC: Apa isu yang relevan dengan diorang? (Tambah keyword Tech & Lifestyle)
 TOPIC_KEYWORDS: List[str] = [
+    # Isu Berat
     "pendidikan", "ekonomi", "kerja", "gaji", "sara hidup", 
     "harga barang", "mental health", "silibus", "ptptn", 
-    "pengangguran", "gig", "part time"
+    "pengangguran", "gig", "part time", "kerjaya", "internship",
+    # Isu Lifestyle & Tech (Untuk SoyaCincau/Cilisos)
+    "tech", "gadget", "smartphone", "internet", "media sosial", 
+    "viral", "trend", "lifestyle", "gaya hidup", "hiburan", 
+    "gaming", "aplikasi", "tiktok", "shopee"
 ]
 
 # Path Setup
@@ -104,9 +109,7 @@ def fetch_feed(source: str, url: str) -> int:
     print(f"  [{source.upper()}] Menarik data...")
 
     try:
-        # User-Agent palsu (supaya tak nampak macam bot Python)
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        
         feed = feedparser.parse(url, agent=user_agent)
         
         if feed.bozo and not feed.entries:
@@ -123,7 +126,6 @@ def fetch_feed(source: str, url: str) -> int:
             title = entry.get("title", "")
             link = entry.get("link", "")
             
-            # Ambil summary/description, buang tag HTML
             summary = entry.get("summary", "")
             clean_text = re.sub(r'<[^>]+>', '', summary).strip()
 
@@ -131,7 +133,7 @@ def fetch_feed(source: str, url: str) -> int:
             if not matches_gatekeeper(title):
                 continue
 
-            # 2. Tapis Teks (Elak artikel kosong/terlalu pendek)
+            # 2. Tapis Teks (Elak artikel kosong)
             if len(clean_text) < 150:
                 continue
 
@@ -160,7 +162,7 @@ def fetch_feed(source: str, url: str) -> int:
 
 def main() -> None:
     print("=" * 60)
-    print("ATRRIC NEWS AUTO-FETCHER (v1.3 - Stable Feeds)")
+    print("ATRRIC NEWS AUTO-FETCHER (v1.4 - Tuned Gatekeeper)")
     print("=" * 60)
 
     total_saved = 0
