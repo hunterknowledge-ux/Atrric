@@ -29,26 +29,27 @@ RSS_FEEDS: Dict[str, str] = {
     "lobakmerah": "https://lobakmerah.com/feed/",
 }
 
-# 1. ENTITY: Siapa yang kita cari?
+# Senarai sumber yang tak perlu strict pada Entity (sebab diorang memang untuk Gen Z)
+LIFESTYLE_SOURCES: List[str] = ["soyacincau", "cilisos", "lobakmerah"]
+
 ENTITY_KEYWORDS: List[str] = [
     "gen z", "belia", "pelajar", "graduan", "fresh grad", 
     "anak muda", "universiti", "sekolah", "remaja", "ipt",
     "gen-z", "mahasiswa", "lepasan spm"
 ]
 
-# 2. TOPIC: Apa isu yang relevan dengan diorang? (Tambah keyword Tech & Lifestyle)
 TOPIC_KEYWORDS: List[str] = [
     # Isu Berat
     "pendidikan", "ekonomi", "kerja", "gaji", "sara hidup", 
     "harga barang", "mental health", "silibus", "ptptn", 
     "pengangguran", "gig", "part time", "kerjaya", "internship",
-    # Isu Lifestyle & Tech (Untuk SoyaCincau/Cilisos)
+    # Isu Lifestyle & Tech
     "tech", "gadget", "smartphone", "internet", "media sosial", 
     "viral", "trend", "lifestyle", "gaya hidup", "hiburan", 
-    "gaming", "aplikasi", "tiktok", "shopee"
+    "gaming", "aplikasi", "tiktok", "shopee", "iphone", 
+    "android", "review", "makanan", "tempat makan"
 ]
 
-# Path Setup
 ROOT_DIR = Path(__file__).parent
 RAW_NEWS_DIR = ROOT_DIR / "raw_data" / "news"
 
@@ -57,32 +58,35 @@ RAW_NEWS_DIR = ROOT_DIR / "raw_data" / "news"
 # FUNGSI TERAS
 # ==========================================
 
-def matches_gatekeeper(title: str) -> bool:
+def matches_gatekeeper(title: str, source: str) -> bool:
     """
-    Tapis tajuk. Mesti ada sekurang-kurangnya 1 Entity DAN 1 Topic.
+    Tapis tajuk. 
+    - Kalau sumber Lifestyle: Cukup ada Topic.
+    - Kalau sumber Berita (FMT): Mesti ada Entity DAN Topic.
     """
     title_lower = title.lower()
-    has_entity = any(kw in title_lower for kw in ENTITY_KEYWORDS)
     has_topic = any(kw in title_lower for kw in TOPIC_KEYWORDS)
+    
+    if source in LIFESTYLE_SOURCES:
+        return has_topic
+    
+    has_entity = any(kw in title_lower for kw in ENTITY_KEYWORDS)
     return has_entity and has_topic
 
 
 def sanitize_filename(title: str, max_length: int = 50) -> str:
-    """Tukar tajuk berita jadi nama fail yang selamat (buang simbol pelik)."""
     safe = re.sub(r'[^a-zA-Z0-9\s-]', '', title).strip().lower()
     safe = re.sub(r'\s+', '_', safe)
     return safe[:max_length]
 
 
 def save_article(source: str, url: str, title: str, text: str, pub_date: str, scraped_at: str) -> None:
-    """Simpan artikel ke folder harian berdasarkan tarikh terbit."""
     daily_dir = RAW_NEWS_DIR / pub_date
     daily_dir.mkdir(parents=True, exist_ok=True)
     
     filename = sanitize_filename(title) + ".txt"
     filepath = daily_dir / filename
 
-    # Idempotent: Kalau dah wujud, skip
     if filepath.exists():
         return
 
@@ -101,10 +105,6 @@ scraped_at: {scraped_at}
 
 
 def fetch_feed(source: str, url: str) -> int:
-    """
-    Tarik satu RSS feed, tapis, dan simpan.
-    Return: bilangan artikel yang berjaya disimpan.
-    """
     saved_count = 0
     print(f"  [{source.upper()}] Menarik data...")
 
@@ -125,19 +125,16 @@ def fetch_feed(source: str, url: str) -> int:
         for entry in feed.entries:
             title = entry.get("title", "")
             link = entry.get("link", "")
-            
             summary = entry.get("summary", "")
             clean_text = re.sub(r'<[^>]+>', '', summary).strip()
 
-            # 1. Tapis Tajuk (Gatekeeper)
-            if not matches_gatekeeper(title):
+            # Pass source ke gatekeeper
+            if not matches_gatekeeper(title, source):
                 continue
 
-            # 2. Tapis Teks (Elak artikel kosong)
             if len(clean_text) < 150:
                 continue
 
-            # 3. Tarikh Terbit
             pub_date_struct = entry.get("published_parsed") or entry.get("updated_parsed")
             
             if pub_date_struct:
@@ -145,7 +142,6 @@ def fetch_feed(source: str, url: str) -> int:
             else:
                 pub_date = now_date
 
-            # 4. Simpan
             save_article(source, link, title, clean_text, pub_date, scraped_at)
             saved_count += 1
             print(f"    [+] [{pub_date}] {title[:45]}...")
@@ -156,13 +152,9 @@ def fetch_feed(source: str, url: str) -> int:
     return saved_count
 
 
-# ==========================================
-# MAIN PROGRAM
-# ==========================================
-
 def main() -> None:
     print("=" * 60)
-    print("ATRRIC NEWS AUTO-FETCHER (v1.4 - Tuned Gatekeeper)")
+    print("ATRRIC NEWS AUTO-FETCHER (v1.5 - Smart Source Logic)")
     print("=" * 60)
 
     total_saved = 0
