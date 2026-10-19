@@ -314,3 +314,5 @@ analytics/discovered/
 __pycache__/
 report/out/
 analytics_out/_checkpoint.jsonl
+raw_data/spatial/*.csv
+raw_data/spatial/*.db
