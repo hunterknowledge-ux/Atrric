@@ -1,30 +1,36 @@
-import urllib.request
+import subprocess
 import json
 import sqlite3
 import os
-import time
 
-def fetch_api_data(url):
-    print(f"Fetching data dari API: {url}")
-    # Cuba sehingga 3 kali jika kena rate limit (HTTP 429)
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=30) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                return data
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                print(f"  [Rate Limit] Cuba lagi dalam 15 saat... (Percubaan {attempt+1}/3)")
-                time.sleep(15)
-            else:
-                print(f"ERROR HTTP: {e.code} - {e.reason}")
-                return None
-        except Exception as e:
-            print(f"ERROR fetch API: {e}")
+def fetch_api_data_curl(url):
+    print(f"Fetching data via curl: {url}")
+    try:
+        # Guna curl (ikut redirect -L) dan ambil output
+        result = subprocess.run(
+            ["curl", "-sL", "-H", "User-Agent: Mozilla/5.0", url],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            print(f"Curl error: {result.stderr}")
             return None
-    print("Gagal selepas 3 percubaan.")
-    return None
+            
+        if not result.stdout.strip():
+            print("Curl return empty response.")
+            return None
+
+        data = json.loads(result.stdout)
+        return data
+    except json.JSONDecodeError:
+        print(f"Response bukan JSON. Mungkin kena block atau rate limit.")
+        print(f"Response preview: {result.stdout[:200]}")
+        return None
+    except Exception as e:
+        print(f"ERROR: {e}")
+        return None
 
 def ingest_to_sqlite(data, db_file, table_name):
     if not data:
@@ -60,7 +66,6 @@ def ingest_to_sqlite(data, db_file, table_name):
         conn.close()
 
 if __name__ == "__main__":
-    # ENDPOINT YANG BETUL: guna /data-catalogue, bukan /opendosm
     API_URL = "https://api.data.gov.my/data-catalogue/?id=population_district&limit=5000"
     
     DB_PATH = "raw_data/spatial/atrric_macro.db"
@@ -68,8 +73,8 @@ if __name__ == "__main__":
 
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    print("=== ATRRIC SPATIAL INGEST (API MODE v2) ===")
-    data = fetch_api_data(API_URL)
+    print("=== ATRRIC SPATIAL INGEST (CURL MODE) ===")
+    data = fetch_api_data_curl(API_URL)
     
     if data:
         print(f"Berjaya tarik {len(data)} baris dari API.")
