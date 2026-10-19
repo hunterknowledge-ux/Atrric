@@ -316,3 +316,25 @@ report/out/
 analytics_out/_checkpoint.jsonl
 raw_data/spatial/*.csv
 raw_data/spatial/*.db
+
+# Environment
+.env
+
+# Databases (Sangat berat & Private)
+*.db
+*.sqlite
+*.sqlite3
+
+# Data Mentah (Hak Cipta & Saiz Besar)
+raw_data/**/*.csv
+raw_data/**/*.json
+raw_data/**/*.txt
+
+# Vector Store
+pocket_vectordb/
+vector_store.json
+manifest.json
+
+# Python Cache
+__pycache__/
+*.pyc
