@@ -61,7 +61,7 @@ def ingest_to_sqlite(data, db_file, table_name):
 
 if __name__ == "__main__":
     # ENDPOINT YANG BETUL: guna /data-catalogue, bukan /opendosm
-    API_URL = "https://api.data.gov.my/data-catalogue?id=population_district&limit=5000"
+    API_URL = "https://api.data.gov.my/data-catalogue/?id=population_district&limit=5000"
     
     DB_PATH = "raw_data/spatial/atrric_macro.db"
     TABLE_NAME = "population_district"
