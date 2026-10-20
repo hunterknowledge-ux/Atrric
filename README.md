@@ -1,4 +1,4 @@
-```markdown
+
 # ATRRIC
 
 **Sovereign RAG & Market Intelligence Engine for Malaysian Gen Z.**
@@ -252,5 +252,3 @@ This project is in early development. Contributions, feedback, and bug reports a
 License
 
 MIT License. See LICENSE for details.
-
-```
