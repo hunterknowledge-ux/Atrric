@@ -10,10 +10,9 @@ from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent / "out"
 
-DEFAULT_PREPARED_FOR = "B2B Client"
 DEFAULT_BRAND_TAG = "Market Intelligence"
 
-# Kita tak letak nombor hardcode kat sini. Nombor akan dijana automatik.
+# Nombor section akan dijana dinamik
 BASE_SECTIONS = [
     ("s01", "Ringkasan Eksekutif"), ("s02", "Snapshot Data"),
     ("s03", "Cerita Utama"), ("s04", "Suara Responden"),
@@ -22,15 +21,12 @@ BASE_SECTIONS = [
 ]
 
 def _get_dynamic_sections(picked: dict) -> list[tuple[str, str]]:
-    """Bina TOC secara dinamik. Kalau takde slang, skip Section 07."""
     sections = []
     slang_data = picked.get("slang_raw", [])
-    
     for sid, title in BASE_SECTIONS:
         if sid == "s08" and slang_data:
             sections.append(("s07", "Bahasa & Slang"))
         sections.append((sid, title))
-        
     return sections
 
 def _default_report_id() -> str:
@@ -82,7 +78,6 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
 
     date_str = meta.get("date") or datetime.now(timezone.utc).strftime("%d %B %Y")
     report_id = meta.get("report_id") or _default_report_id()
-    prepared_for = meta.get("prepared_for") or DEFAULT_PREPARED_FOR
     period = meta.get("period") or _default_period()
     total = summary.get("total_comments", 0)
 
@@ -92,7 +87,6 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
 
     lines.append("# ATRRIC · Market Intelligence\n\n**CONFIDENTIAL**\n")
     lines.append("| | |\n|---|---|")
-    lines.append(f"| Prepared for | {prepared_for} |")
     lines.append(f"| Report ID | {report_id} |")
     lines.append(f"| Period | {period} |")
     lines.append(f"| Sample size | {total} komen |\n---\n")
@@ -104,7 +98,6 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     for i, (_, title) in enumerate(sections, start=1): lines.append(f"{i}. {title}")
     lines.append("")
 
-    # Auto-numbering untuk markdown
     def sec_num(sid):
         for i, (s, _) in enumerate(sections, start=1):
             if s == sid: return f"{i:02d}"
@@ -253,7 +246,7 @@ section:has(> .topic-card), section:has(> .entity-card){display:grid;grid-templa
 .slang-list li::before{content:'';flex:none;width:.4rem;height:.4rem;background:var(--accent);transform:translateY(-.12em);} .slang-word{flex:none;min-width:6.25rem;font-family:var(--font-mono);font-size:.9375rem;font-weight:600;color:var(--accent);}
 .methodology,.disclaimer{color:var(--ink-2);border-top:1px solid var(--border)} .methodology{margin-top:4rem;padding-top:1.35rem;font-size:.9375rem;line-height:1.65} .methodology h2{display:block;margin:0 0 .6rem;padding:0;border:0;font-size:1.0625rem;color:var(--ink);} .disclaimer{margin-top:1.75rem;padding-top:1.1rem;font-size:var(--fs-label);line-height:1.6}
 footer{margin-top:3.5rem;padding-top:1.25rem;border-top:1px solid var(--border);text-align:center;font-size:.8rem;line-height:1.6;color:var(--ink-2);} .footer-brand{font-weight:600;letter-spacing:.08em;color:var(--ink)} .footer-meta{margin-top:.2rem}
-@media (min-width:40rem){.report-meta{grid-template-columns:repeat(4,minmax(0,1fr))} .meta-item + .meta-item{padding-left:1.25rem;border-left:1px solid var(--border)} .toc ol{columns:2;column-gap:2.5rem}}
+@media (min-width:40rem){.report-meta{grid-template-columns:repeat(3,minmax(0,1fr))} .meta-item + .meta-item{padding-left:1.25rem;border-left:1px solid var(--border)} .toc ol{columns:2;column-gap:2.5rem}}
 @media (min-width:46rem){section:has(> .topic-card){grid-template-columns:repeat(2,minmax(0,1fr))} section:has(> .topic-card) > h2{grid-column:1 / -1}}
 @supports (text-wrap:balance){h1,h2{text-wrap:balance}} @supports (text-wrap:pretty){p,li,blockquote,.lede{text-wrap:pretty}}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}} body > *{animation:rise .26s ease-out both}
@@ -278,7 +271,6 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
 
     date_str = meta.get("date") or datetime.now(timezone.utc).strftime("%d %B %Y")
     report_id = meta.get("report_id") or _default_report_id()
-    prepared_for = meta.get("prepared_for") or DEFAULT_PREPARED_FOR
     period = meta.get("period") or _default_period()
     total = summary.get("total_comments", 0)
 
@@ -303,7 +295,7 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     parts.append(f'<span class="brand-tag">{esc(DEFAULT_BRAND_TAG)}</span></div><span class="confidential-badge">Confidential</span></header>')
 
     parts.append('<section class="report-meta">')
-    for label, value in [("Prepared for", prepared_for), ("Report ID", report_id), ("Period", period), ("Sample size", f"{total} komen")]:
+    for label, value in [("Report ID", report_id), ("Period", period), ("Sample size", f"{total} komen")]:
         parts.append(f'<div class="meta-item"><span class="meta-label">{esc(label)}</span><span class="meta-value">{esc(value)}</span></div>')
     parts.append("</section>")
 
