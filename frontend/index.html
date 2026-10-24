@@ -18,19 +18,26 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,s
 body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(70% 38% at 50% -6%,rgba(99,102,241,.16),transparent 70%)}
 #app{position:relative;z-index:1;height:100vh;height:100dvh;display:flex;flex-direction:column}
 :focus-visible{outline:2px solid #818cf8;outline-offset:2px}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
 /* header */
 .glass{background:rgba(9,9,11,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .hline{position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.75),rgba(139,92,246,.75),transparent)}
 .beta{font-size:10px;font-weight:500;line-height:1;color:#c7d2fe;padding:3px 7px;border-radius:9999px;border:1px solid transparent;background:linear-gradient(#18181b,#18181b) padding-box,var(--grad) border-box}
+.iconbtn{width:40px;height:40px;display:grid;place-items:center;border:1px solid transparent;border-radius:12px;background:transparent;color:#a1a1aa;cursor:pointer;transition:color .15s,background .15s,border-color .15s,transform .1s}
+.iconbtn:hover{color:#e4e4e7;background:#18181b;border-color:#27272a}
+.iconbtn:active{transform:scale(.94)}
 
 /* main */
-#main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:#3f3f46 transparent}
+#main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#3f3f46 transparent}
 #hero{flex:none;margin:auto;width:100%;max-width:42rem;padding:40px 20px;text-align:center}
 #thread{flex:none;width:100%;max-width:42rem;margin:0 auto;padding:24px 16px 28px;display:flex;flex-direction:column;gap:22px}
-.ex{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:rgba(24,24,27,.6);border:1px solid #27272a;color:#d4d4d8;font-size:14px;line-height:1.45;cursor:pointer;transition:border-color .15s,background .15s,transform .1s}
-.ex:hover{border-color:rgba(129,140,248,.5);background:#18181b}
-.ex:active{transform:scale(.99)}
+.ex{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:rgba(24,24,27,.6);border:1px solid #27272a;color:#d4d4d8;font-size:14px;line-height:1.45;cursor:pointer;transition:border-color .18s,background .18s,color .18s,box-shadow .18s,transform .18s cubic-bezier(.2,.8,.2,1);animation:rise .42s cubic-bezier(.2,.8,.2,1) backwards}
+.ex:nth-child(2){animation-delay:.07s}
+.ex:nth-child(3){animation-delay:.14s}
+@media (hover:hover){.ex:hover{border-color:rgba(129,140,248,.55);background:#18181b;color:#f4f4f5;transform:scale(1.015);box-shadow:0 0 0 1px rgba(129,140,248,.18),0 10px 28px -12px rgba(99,102,241,.65)}}
+.ex:focus-visible{border-color:rgba(129,140,248,.55);box-shadow:0 0 0 1px rgba(129,140,248,.18),0 10px 28px -12px rgba(99,102,241,.65)}
+.ex:active{transform:scale(.985)}
 
 /* avatars + rows */
 .av{flex:none;width:28px;height:28px;border-radius:9999px;display:grid;place-items:center;font-size:12px;font-weight:600;margin-top:2px}
@@ -40,13 +47,19 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
 .row{display:flex;gap:10px;align-items:flex-start;transform-origin:left top;animation:pop .24s cubic-bezier(.2,.8,.2,1) both}
 .row.me{justify-content:flex-end;transform-origin:right bottom}
 .col{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.ucol{min-width:0;max-width:85%;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .bub{border-radius:20px;padding:12px 16px;font-size:15px;line-height:1.65;min-width:0}
-.bub.me{background:#27272a;border-top-right-radius:6px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub.me{background:#27272a;border-top-right-radius:6px;max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
 .bub.ai{background:#18181b;border:1px solid #27272a;border-top-left-radius:6px;max-width:100%}
 .bub.err{display:flex;gap:8px;align-items:flex-start;background:rgba(69,10,10,.28);border-color:rgba(127,29,29,.55);color:#fca5a5;font-size:14px}
 .bub.err .ic{flex:none;margin-top:3px;display:inline-flex}
 .bub.muted{color:#a1a1aa;font-size:14px}
 @keyframes pop{from{opacity:0;transform:scale(.96) translateY(6px)}to{opacity:1;transform:none}}
+
+/* timestamps */
+.time{font-size:11px;line-height:1;color:#71717a;font-variant-numeric:tabular-nums}
+.ucol .time{padding-right:2px}
+.acts .time{margin-left:10px}
 
 /* typing dots */
 .dots{display:flex;gap:6px;padding:6px 2px}
@@ -61,10 +74,17 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
 .chip svg{flex:none;color:#71717a}
 .chip .n{min-width:0;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip b{flex:none;font-weight:500;color:#71717a;font-variant-numeric:tabular-nums}
-.act{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 8px;margin-left:-8px;border:0;border-radius:8px;background:none;color:#71717a;font:inherit;font-size:12px;cursor:pointer;transition:color .15s,background .15s}
+.acts{display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:100%}
+.act{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 8px;border:0;border-radius:8px;background:none;color:#71717a;font:inherit;font-size:12px;cursor:pointer;transition:color .15s,background .15s}
+.acts .act:first-child{margin-left:-8px}
 .act:hover{color:#d4d4d8;background:#18181b}
 .act.ok{color:#a5b4fc}
 .act.retry{font-size:13px;color:#a5b4fc;text-decoration:underline;text-underline-offset:3px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:10px 16px;border-radius:9999px;background:rgba(39,39,42,.94);border:1px solid #3f3f46;color:#f4f4f5;font-size:13px;line-height:1.3;box-shadow:0 10px 30px -10px rgba(0,0,0,.65);opacity:0;visibility:hidden;transform:translate(-50%,8px);pointer-events:none;transition:opacity .2s ease,transform .2s ease,visibility 0s linear .2s}
+.toast.show{opacity:1;visibility:visible;transform:translate(-50%,0);transition-delay:0s}
+.toast svg{flex:none;color:#a5b4fc}
 
 /* composer */
 .composer{border-radius:18px;padding:1px;background:#27272a;transition:box-shadow .2s}
@@ -106,7 +126,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
 .prose th,.prose td{border:1px solid #27272a;padding:6px 10px;text-align:left}
 .prose th{background:#1f1f23;color:#fafafa;font-weight:600}
 
-@media (prefers-reduced-motion:reduce){.row{animation:none}.dots i{animation:none}}
+@media (prefers-reduced-motion:reduce){.row,.ex{animation:none}.dots i{animation:none}.toast{transition:none}#main{scroll-behavior:auto}}
 </style>
 </head>
 <body>
@@ -116,6 +136,9 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     <div class="max-w-2xl mx-auto px-4 h-14 flex items-center gap-2">
       <span class="text-[17px] font-semibold tracking-tight">Atrric</span>
       <span class="beta">beta</span>
+      <button id="newchat" type="button" class="iconbtn ml-auto -mr-1" aria-label="Sembang baru" title="Sembang baru">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>
+      </button>
     </div>
     <div class="hline"></div>
   </header>
@@ -146,23 +169,26 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
 
 </div>
 
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script>
 (() => {
   const USER_INITIAL = 'U'; // tukar kepada huruf pertama nama anda
   const $ = id => document.getElementById(id);
-  const main = $('main'), hero = $('hero'), thread = $('thread'), input = $('q'), btn = $('send');
-  let busy = false, ctrl = null, lastQ = '';
+  const main = $('main'), hero = $('hero'), thread = $('thread'), input = $('q'), btn = $('send'), toastEl = $('toast');
+  let busy = false, ctrl = null, lastQ = '', epoch = 0, toastT = 0;
 
   const svg = (d, s = 14, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const I = {
-    copy:  svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>'),
-    check: svg('<path d="M20 6 9 17l-5-5"/>'),
-    file:  svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>', 12),
-    warn:  svg('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>', 16),
-    send:  svg('<path d="M12 19V5M5 12l7-7 7 7"/>', 16, 2.4),
-    stop:  svg('<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/>', 16, 2)
+    copy:    svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>'),
+    check:   svg('<path d="M20 6 9 17l-5-5"/>'),
+    refresh: svg('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'),
+    file:    svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>', 12),
+    warn:    svg('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>', 16),
+    send:    svg('<path d="M12 19V5M5 12l7-7 7 7"/>', 16, 2.4),
+    stop:    svg('<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/>', 16, 2)
   };
 
   function el(tag, cls, text) {
@@ -170,6 +196,15 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
+  }
+
+  /* toast */
+  function toast(msg, icon) {
+    toastEl.innerHTML = icon === undefined ? I.check : icon;
+    toastEl.append(el('span', '', msg));
+    toastEl.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => toastEl.classList.remove('show'), 2200);
   }
 
   /* markdown: marked + DOMPurify (fallback: plain text bila CDN gagal) */
@@ -187,7 +222,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     }
   }
 
-  /* scroll lock */
+  /* scroll lock (smooth hanya untuk scroll programatik; gerakan jari tidak terjejas) */
   const nearBottom = () => main.scrollHeight - main.scrollTop - main.clientHeight < 120;
   const toBottom = () => { main.scrollTop = main.scrollHeight; };
   function add(node, force) {
@@ -206,15 +241,28 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
   }
 
   /* rows */
+  const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  function timeEl() {
+    const t = el('time', 'time', nowTime());
+    t.dateTime = new Date().toISOString();
+    return t;
+  }
   function userRow(text) {
-    const r = el('div', 'row me');
-    r.append(el('div', 'bub me', text), el('div', 'av me', USER_INITIAL));
+    const r = el('div', 'row me'), c = el('div', 'ucol');
+    c.append(el('div', 'bub me', text), timeEl());
+    r.append(c, el('div', 'av me', USER_INITIAL));
     return r;
   }
   function aiShell() {
     const r = el('div', 'row'), c = el('div', 'col');
     r.append(el('div', 'av ai', 'A'), c);
     return { r, c };
+  }
+  function actRow(...btns) {
+    const w = el('div', 'acts');
+    btns.forEach(b => w.append(b));
+    w.append(timeEl());
+    return w;
   }
   function loadingRow() {
     const { r, c } = aiShell();
@@ -254,14 +302,23 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     };
     paint(false);
     b.addEventListener('click', async () => {
-      if (!(await copyText(text))) return;
+      if (!(await copyText(text))) { toast('Gagal menyalin teks', ''); return; }
       paint(true);
+      toast('Teks disalin ke papan klip');
       clearTimeout(b._t);
       b._t = setTimeout(() => paint(false), 1500);
     });
     return b;
   }
-  function answerRow(answer, sources) {
+  function regenBtn(row, q) {
+    const b = el('button', 'act');
+    b.type = 'button';
+    b.dataset.retry = '1'; 
+    b.innerHTML = I.refresh + '<span>Jana Semula</span>';
+    b.addEventListener('click', () => send(q, { retry: true, row }));
+    return b;
+  }
+  function answerRow(answer, sources, q) {
     const { r, c } = aiShell();
     const b = el('div', 'bub ai'), p = el('div', 'prose');
     renderMd(p, answer);
@@ -272,7 +329,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
       sources.forEach(s => w.append(chip(s)));
       c.append(w);
     }
-    c.append(copyBtn(answer));
+    c.append(actRow(copyBtn(answer), regenBtn(r, q)));
     return r;
   }
   function errorRow(msg, stopped) {
@@ -285,7 +342,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     a.type = 'button';
     a.dataset.retry = '1';
     a.addEventListener('click', () => send(lastQ, { retry: true, row: r }));
-    c.append(a);
+    c.append(actRow(a));
     return r;
   }
   const cleanSources = s => Array.isArray(s) ? s.filter(x => typeof x === 'string' && x.trim()) : [];
@@ -303,6 +360,23 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     btn.setAttribute('aria-label', v ? 'Henti' : 'Hantar');
     sync();
   }
+  function stop() { if (busy && ctrl) ctrl.abort(); }
+
+  /* new chat */
+  function newChat() {
+    epoch++;                                   
+    if (ctrl) { ctrl.abort(); ctrl = null; }
+    setBusy(false);
+    thread.innerHTML = '';
+    thread.hidden = true;
+    hero.hidden = false;
+    lastQ = '';
+    input.value = '';
+    fit();
+    sync();
+    main.scrollTo({ top: 0, behavior: 'instant' });
+    toast('Sembang baru dibuka');
+  }
 
   /* send */
   async function send(q, opts) {
@@ -310,6 +384,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
     q = (q || '').trim();
     if (busy || !q) return;
     lastQ = q;
+    const mine = epoch;
     thread.querySelectorAll('[data-retry]').forEach(n => n.remove());
     hero.hidden = true;
     thread.hidden = false;
@@ -328,19 +403,21 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
       if (!data) throw new Error('Respons pelayan tidak sah.');
       const answer = typeof data.answer === 'string' ? data.answer : '';
       const err = data.error || (answer.trim() ? '' : '(tiada jawapan)');
-      out = err ? errorRow(String(err)) : answerRow(answer, cleanSources(data.sources));
+      out = err ? errorRow(String(err)) : answerRow(answer, cleanSources(data.sources), q);
     } catch (e) {
       if (e && e.name === 'AbortError') out = errorRow('Dihentikan.', true);
       else if (e instanceof TypeError) out = errorRow('Tidak dapat menghubungi pelayan. Pastikan server di Termux sedang berjalan.');
       else out = errorRow((e && e.message) || '(tiada jawapan)');
     }
+    if (mine !== epoch) return;                
     swapIn(loading, out);
     ctrl = null;
     setBusy(false);
   }
 
   /* events */
-  btn.addEventListener('click', () => { if (busy) { if (ctrl) ctrl.abort(); } else send(input.value); });
+  btn.addEventListener('click', () => { if (busy) stop(); else send(input.value); });
+  $('newchat').addEventListener('click', newChat);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -351,6 +428,14 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background:ra
   hero.addEventListener('click', e => {
     const b = e.target.closest('[data-q]');
     if (b) send(b.dataset.q);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && busy) { stop(); return; }
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== input
+        && !(e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]'))) {
+      e.preventDefault();
+      input.focus();
+    }
   });
 
   setBusy(false);
