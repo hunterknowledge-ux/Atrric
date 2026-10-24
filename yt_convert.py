@@ -19,8 +19,8 @@ Usage:
 """
 
 import json
-import sys
 import re
+import sys
 from pathlib import Path
 
 MIN_LENGTH = 20
@@ -108,8 +108,8 @@ def cmd_stats(output_path):
     for p in posts:
         m = re.search(r'\[Post (\d+)\]', p)
         op = re.search(r'OP: (.+?)(?:\n|$)', p)
-        r_count = len(re.findall(r'^R:', p, re.M))
-        rr_count = len(re.findall(r'^R:R:', p, re.M))
+        r_count = len(re.findall(r'^R:', p, re.MULTILINE))
+        rr_count = len(re.findall(r'^R:R:', p, re.MULTILINE))
         n = m.group(1) if m else '?'
         title = op.group(1)[:70] if op else '?'
         print(f"  Post {n}: {r_count} top + {rr_count} replies")
@@ -176,14 +176,14 @@ def cmd_convert(input_path, output_path, force=False, dry_run=False):
     if not comments:
         print(f"WARN: No comments in {input_path}")
         print(f"      Title: {clean_text(title)[:80]}")
-        print(f"      (Video mungkin takde komen atau comments disabled)")
+        print("      (Video mungkin takde komen atau comments disabled)")
         return
 
     # Duplicate check
     if not force and already_converted(output_path, title):
         print(f"SKIP  Already exists in {output_path}")
         print(f"      Title: {clean_text(title)[:80]}")
-        print(f"      Use --force to override.")
+        print("      Use --force to override.")
         return
 
     # Process

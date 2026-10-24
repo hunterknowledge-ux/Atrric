@@ -13,12 +13,13 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.env_loader import load_env
+
 load_env()
 
 from omnifuse import InMemoryGraph
-from core.rag import RAG
-from core.ilmu_llm import IlmuLLM
 
+from core.ilmu_llm import IlmuLLM
+from core.rag import RAG
 
 QUERIES = [
     "Kenapa Gen Z dikatakan lemah?",

@@ -3,9 +3,10 @@ report.template — render report.md + report.html (B2B consulting format).
 """
 
 from __future__ import annotations
+
 import html
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent / "out"
@@ -30,10 +31,10 @@ def _get_dynamic_sections(picked: dict) -> list[tuple[str, str]]:
     return sections
 
 def _default_report_id() -> str:
-    return "ATRRIC-" + datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return "ATRRIC-" + datetime.now(UTC).strftime("%Y-%m-%d")
 
 def _default_period() -> str:
-    return datetime.now(timezone.utc).strftime("%B %Y")
+    return datetime.now(UTC).strftime("%B %Y")
 
 def _split_exec_summary(cerita_utama: str) -> tuple[str | None, list[str]]:
     text = (cerita_utama or "").strip()
@@ -76,7 +77,7 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     summary = data.get("summary", {})
     lines: list[str] = []
 
-    date_str = meta.get("date") or datetime.now(timezone.utc).strftime("%d %B %Y")
+    date_str = meta.get("date") or datetime.now(UTC).strftime("%d %B %Y")
     report_id = meta.get("report_id") or _default_report_id()
     period = meta.get("period") or _default_period()
     total = summary.get("total_comments", 0)
@@ -140,7 +141,7 @@ def render_markdown(data: dict, picked: dict, narrative: dict, meta: dict | None
     model = narrative.get("_meta", {}).get("model", "-")
     cost = meta.get("cost_est_rm")
     cost_str = f"~RM{cost:.6f}" if isinstance(cost, float) else "-"
-    lines.append(f"*ATRRIC · Market Intelligence for Gen Z Malaysia*  ")
+    lines.append("*ATRRIC · Market Intelligence for Gen Z Malaysia*  ")
     lines.append(f"*Report ID {report_id} · {total} komen · model `{model}` · kos {cost_str}*")
 
     return "\n".join(lines)
@@ -269,7 +270,7 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
     summary = data.get("summary", {})
     esc = html.escape
 
-    date_str = meta.get("date") or datetime.now(timezone.utc).strftime("%d %B %Y")
+    date_str = meta.get("date") or datetime.now(UTC).strftime("%d %B %Y")
     report_id = meta.get("report_id") or _default_report_id()
     period = meta.get("period") or _default_period()
     total = summary.get("total_comments", 0)
@@ -299,7 +300,7 @@ def render_html(data: dict, picked: dict, narrative: dict, meta: dict | None = N
         parts.append(f'<div class="meta-item"><span class="meta-label">{esc(label)}</span><span class="meta-value">{esc(value)}</span></div>')
     parts.append("</section>")
 
-    parts.append(f"<h1>Gen Z Malaysia Trend Report</h1>")
+    parts.append("<h1>Gen Z Malaysia Trend Report</h1>")
     parts.append(f'<p class="lede">{esc(narrative.get("headline", ""))}</p>')
 
     parts.append('<nav class="toc"><div class="toc-title">Kandungan</div><ol>')

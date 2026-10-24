@@ -12,9 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import config
-from core.chunk import chunk_text
-from core.embed import embed, EmbedError
 from core import store as vector_store
+from core.chunk import chunk_text
+from core.embed import EmbedError, embed
 
 
 def build() -> None:
@@ -68,7 +68,7 @@ def build() -> None:
 
     vector_store.save(chunks)
     print()
-    print(f"=== DONE ===")
+    print("=== DONE ===")
     print(f"Chunks stored: {len(chunks)}")
     print(f"Store: {config.VECTOR_STORE_FILE}")
 

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 _SCHEMA = Path(__file__).parent.parent / "core" / "ontology_schema.json"
 _cache = None
 def load():

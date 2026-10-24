@@ -16,9 +16,8 @@ Output contract (load_all):
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
-
 
 # --- Path resolution: guna config kalau ada, fallback relatif repo ---
 try:
@@ -41,7 +40,7 @@ def load_all(limit: int | None = None) -> dict:
         "summary": summary,
         "comments": comments,
         "meta": {
-            "loaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "loaded_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "total_loaded": len(comments),
             "sources": _unique_sources(comments),
         },

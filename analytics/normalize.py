@@ -1,4 +1,5 @@
 import re
+
 _URL = re.compile(r"https?://\S+")
 _MENTION = re.compile(r"@\w+")
 _HASHTAG = re.compile(r"#(\w+)")

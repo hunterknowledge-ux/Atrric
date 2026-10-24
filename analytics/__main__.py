@@ -1,10 +1,11 @@
-import sys
 import json
+import sys
 from pathlib import Path
-from .loader import load_all
+
+from .aggregate import write
 from .discover import run as discover
 from .extract import one as extract_one
-from .aggregate import write
+from .loader import load_all
 
 CKPT = Path("analytics_out/_checkpoint.jsonl")
 CKPT_INTERVAL = 20

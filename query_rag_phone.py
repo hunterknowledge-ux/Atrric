@@ -17,10 +17,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import config
-from core.embed import embed, EmbedError
-from core.llm import generate, LLMError
 from core import store as vector_store
-
+from core.embed import EmbedError, embed
+from core.llm import LLMError, generate
 
 # ─────────────────────────────────────────────────────────────
 # Layer 1: Aggressive system prompt

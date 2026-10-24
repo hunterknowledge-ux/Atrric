@@ -1,10 +1,13 @@
 """Smoke test graph fusion — InMemoryGraph primitives + RAG integration."""
 
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from omnifuse.models import Node, Triple
 from omnifuse import InMemoryGraph
+from omnifuse.models import Node, Triple
+
 from core.rag import RAG
 
 

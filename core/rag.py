@@ -7,7 +7,8 @@ Bila nak swap engine lain (ship time), tukar file ni sahaja.
 v2: Auto-load ontology graph kalau ada.
 """
 
-from omnifuse import OmniFuse, EchoLLM, InMemoryGraph
+from omnifuse import EchoLLM, InMemoryGraph, OmniFuse
+
 from core.omnifuse_adapter import PocketVectorStore
 
 

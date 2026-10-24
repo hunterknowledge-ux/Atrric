@@ -15,19 +15,19 @@ import json
 import re
 import sys
 import time
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.env_loader import load_env
+
 load_env()
 
 from core.ilmu_llm import IlmuLLM
 from core.store import _get_db
-
 
 SCHEMA_FILE = _ROOT / "core" / "ontology_schema.json"
 OUTPUT_FILE = _ROOT / "ontology_graph.json"
@@ -300,7 +300,7 @@ def main():
 
         except KeyboardInterrupt:
             print("\n\n[!] Stopped. Progress saved.")
-            print(f"    Run semula untuk resume.")
+            print("    Run semula untuk resume.")
 
     # Build final graph dari semua progress
     print("\n=== BUILDING GRAPH ===")
@@ -321,7 +321,7 @@ def main():
     for r in results:
         for a in r.get("attributes", []):
             attr_dist[a["attribute"]] += 1
-    print(f"\n=== DISTRIBUTION ===")
+    print("\n=== DISTRIBUTION ===")
     for attr, count in attr_dist.most_common():
         pct = count / len(results) * 100 if results else 0
         print(f"  {attr}: {count} ({pct:.0f}%)")

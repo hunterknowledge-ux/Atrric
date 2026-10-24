@@ -6,14 +6,11 @@ Fungsi: Proses data mentah ke format siap untuk RAG.
 Cara guna: python data_pipeline.py
 """
 
-import os
-import sys
 import json
 import logging
 import re
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict
+from pathlib import Path
 
 # ======================================================================
 # KONFIGURASI
@@ -175,7 +172,7 @@ def clean_text(text: str) -> str:
     
     return text.strip()
 
-def semantic_chunk_manglish(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+def semantic_chunk_manglish(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
     """
     Potong teks dengan kesedaran bahasa tempatan.
     - Cuba split ikut ayat (., !, ?)
@@ -224,11 +221,11 @@ def semantic_chunk_manglish(text: str, chunk_size: int = CHUNK_SIZE, overlap: in
 # FUNGSI UTAMA
 # ======================================================================
 
-def read_files() -> List[Dict]:
+def read_files() -> list[dict]:
     """Baca semua fail dalam raw_data/"""
     files = []
     if not RAW_DATA_DIR.exists():
-        logger.error(f"❌ Folder raw_data/ tidak dijumpai.")
+        logger.error("❌ Folder raw_data/ tidak dijumpai.")
         logger.info("💡 Buat folder raw_data/ dan letak fail mentah di dalamnya.")
         return files
     
@@ -249,11 +246,11 @@ def read_files() -> List[Dict]:
     
     return files
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
     """Potong teks kepada chunks (guna semantic chunking untuk Manglish)."""
     return semantic_chunk_manglish(text, chunk_size, overlap)
 
-def process_files(files: List[Dict]) -> Dict:
+def process_files(files: list[dict]) -> dict:
     """Process semua files dan hasilkan output"""
     results = {
         "total_files": len(files),
@@ -287,7 +284,7 @@ def process_files(files: List[Dict]) -> Dict:
     
     return results
 
-def save_report(results: Dict):
+def save_report(results: dict):
     """Simpan report proses"""
     report_file = DATA_DIR / "pipeline_report.json"
     with open(report_file, 'w', encoding='utf-8') as f:

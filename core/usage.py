@@ -88,7 +88,7 @@ def report(days: int = None):
         by_label[lbl]["calls"] += 1
         by_label[lbl]["cost"] += r.get("cost_rm", 0.0)
 
-    print(f"=== ILMU Usage Report ===")
+    print("=== ILMU Usage Report ===")
     print(f"Period: {'last ' + str(days) + ' days' if days else 'all time'}")
     print()
     print(f"Total calls:    {total_calls}")

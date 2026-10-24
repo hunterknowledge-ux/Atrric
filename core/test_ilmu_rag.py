@@ -1,12 +1,15 @@
 """E2E test — RAG + ILMU LLM."""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.env_loader import load_env
+
 load_env()
 
-from core.rag import RAG
 from core.ilmu_llm import IlmuLLM
+from core.rag import RAG
 
 
 def main():

@@ -16,7 +16,6 @@ EXPECTED_DIM = 1024
 
 class EmbedError(Exception):
     """Raised when embedding fails."""
-    pass
 
 
 _DEFAULT_URL = "https://api.ilmu.ai/v1"

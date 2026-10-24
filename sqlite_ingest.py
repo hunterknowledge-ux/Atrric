@@ -1,6 +1,6 @@
-import sqlite3
 import csv
 import os
+import sqlite3
 import sys
 
 # Naikkan had field CSV sebab fail DOSM ni besar

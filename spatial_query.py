@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def query_db(db_file, sql_query):
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()

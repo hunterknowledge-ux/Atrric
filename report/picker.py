@@ -3,6 +3,7 @@ report.picker — rule-based selection. TAK panggil LLM.
 """
 
 from __future__ import annotations
+
 from collections import defaultdict
 
 TOP_QUOTES_N     = 5

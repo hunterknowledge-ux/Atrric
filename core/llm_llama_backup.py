@@ -13,7 +13,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,7 +22,6 @@ import config
 
 class LLMError(Exception):
     """Raised when LLM generation fails."""
-    pass
 
 
 _IM_END = "<|im_end|>"
@@ -31,7 +29,7 @@ _IM_END = "<|im_end|>"
 
 def generate(
     prompt: str,
-    max_tokens: Optional[int] = None,
+    max_tokens: int | None = None,
     timeout: int = 300,
 ) -> str:
     """

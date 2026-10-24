@@ -3,9 +3,11 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
-from .store import load, save
-from .normalize import tokens
+
 from core.llm import generate_json
+
+from .normalize import tokens
+from .store import load, save
 
 _S = json.loads((Path(__file__).parent / "settings.json").read_text())
 
@@ -83,7 +85,7 @@ def _cand_slang(texts):
 def _verify(cands, kind, texts):
     if not cands: return []
     def ctx_for(w):
-        pat = re.compile(rf"\b{re.escape(w)}\b", re.I)
+        pat = re.compile(rf"\b{re.escape(w)}\b", re.IGNORECASE)
         for t in texts:
             for sent in t.split(". "):
                 if pat.search(sent): return sent[:150]

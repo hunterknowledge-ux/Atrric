@@ -1,9 +1,10 @@
 import re
 from pathlib import Path
+
 from .normalize import clean
 
 _D = [(re.compile(r"^\s*>{2,}\s*"), 2), (re.compile(r"^\s*>\s*"), 1),
-      (re.compile(r"^\s*R:\s*", re.I), 1), (re.compile(r"^\s*OP:\s*", re.I), 0)]
+      (re.compile(r"^\s*R:\s*", re.IGNORECASE), 1), (re.compile(r"^\s*OP:\s*", re.IGNORECASE), 0)]
 
 _HEADER_RE = re.compile(r"^\s*\[[^\]]+\]\s*$")
 _SKIP = {"__pycache__", "discovered", "out", "analytics_out"}

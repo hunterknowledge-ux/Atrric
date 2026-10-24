@@ -10,11 +10,9 @@ Guna:
 """
 
 import re
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 import feedparser
 
@@ -22,7 +20,7 @@ import feedparser
 # KONFIGURASI
 # ==========================================
 
-RSS_FEEDS: Dict[str, str] = {
+RSS_FEEDS: dict[str, str] = {
     "fmt_bm": "https://www.freemalaysiatoday.com/category/bahasa/feed/",
     "soyacincau": "https://soyacincau.com/feed/",
     "cilisos": "https://cilisos.my/feed/",
@@ -30,15 +28,15 @@ RSS_FEEDS: Dict[str, str] = {
 }
 
 # Senarai sumber yang tak perlu strict pada Entity (sebab diorang memang untuk Gen Z)
-LIFESTYLE_SOURCES: List[str] = ["soyacincau", "cilisos", "lobakmerah"]
+LIFESTYLE_SOURCES: list[str] = ["soyacincau", "cilisos", "lobakmerah"]
 
-ENTITY_KEYWORDS: List[str] = [
+ENTITY_KEYWORDS: list[str] = [
     "gen z", "belia", "pelajar", "graduan", "fresh grad", 
     "anak muda", "universiti", "sekolah", "remaja", "ipt",
     "gen-z", "mahasiswa", "lepasan spm"
 ]
 
-TOPIC_KEYWORDS: List[str] = [
+TOPIC_KEYWORDS: list[str] = [
     # Isu Berat
     "pendidikan", "ekonomi", "kerja", "gaji", "sara hidup", 
     "harga barang", "mental health", "silibus", "ptptn", 

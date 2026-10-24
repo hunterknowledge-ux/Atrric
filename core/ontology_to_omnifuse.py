@@ -17,9 +17,8 @@ _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from omnifuse.models import Node, Triple
 from omnifuse import InMemoryGraph
-
+from omnifuse.models import Node, Triple
 
 ONTOLOGY_FILE = _ROOT / "ontology_graph.json"
 
@@ -58,8 +57,7 @@ def convert(ontology):
     for e in ontology["edges"]:
         subj = e["subject"]
         # Strip prefix kalau subject is chunk node
-        if subj.startswith("chunk_"):
-            subj = subj[6:]
+        subj = subj.removeprefix("chunk_")
 
         triples.append(Triple(
             s=subj,

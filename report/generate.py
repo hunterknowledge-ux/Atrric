@@ -3,6 +3,7 @@ report.generate — 1 LLM call untuk naratif utama.
 """
 
 from __future__ import annotations
+
 from typing import Any
 
 SYSTEM_PROMPT = """\

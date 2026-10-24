@@ -12,23 +12,22 @@ PocketVectorDB API (verified 2026-10):
 
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import numpy as np
 
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import config
 from pocketvectordb import VectorDB
+
+import config
 
 
 class StoreError(Exception):
     """Raised when store operations fail."""
-    pass
 
 
-_db: Optional[VectorDB] = None
+_db: VectorDB | None = None
 
 
 def _get_db() -> VectorDB:
@@ -45,7 +44,7 @@ def _get_db() -> VectorDB:
     return _db
 
 
-def load(path: Optional[Path] = None) -> List[Dict]:
+def load(path: Path | None = None) -> list[dict]:
     """
     Return a list with length = number of chunks in store.
 
@@ -60,7 +59,7 @@ def load(path: Optional[Path] = None) -> List[Dict]:
     return [{"id": i} for i in range(n)]
 
 
-def save(chunks: List[Dict], path: Optional[Path] = None) -> None:
+def save(chunks: list[dict], path: Path | None = None) -> None:
     """Explicit persist. PocketVectorDB may not auto-save on process exit."""
     db = _get_db()
     try:
@@ -70,11 +69,11 @@ def save(chunks: List[Dict], path: Optional[Path] = None) -> None:
 
 
 def add_chunk(
-    chunks: List[Dict],
+    chunks: list[dict],
     text: str,
-    vector: List[float],
+    vector: list[float],
     source: str,
-) -> Dict:
+) -> dict:
     """Add one chunk. Returns {id, text, source}."""
     db = _get_db()
     try:
@@ -93,10 +92,10 @@ def add_chunk(
 
 
 def search(
-    query_vector: List[float],
+    query_vector: list[float],
     top_k: int = 3,
-    chunks: Optional[List[Dict]] = None,
-) -> List[Dict]:
+    chunks: list[dict] | None = None,
+) -> list[dict]:
     """
     Find top_k most similar chunks.
 
@@ -137,7 +136,7 @@ if __name__ == "__main__":
 
     dim = config.EMBED_DIM
 
-    def make_vec(seed: int) -> List[float]:
+    def make_vec(seed: int) -> list[float]:
         """Deterministic 128D pseudo-random vector."""
         np.random.seed(seed)
         v = np.random.randn(dim).astype(np.float32)

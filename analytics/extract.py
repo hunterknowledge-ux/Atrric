@@ -1,5 +1,6 @@
-from .store import load as load_discovered
 from core.llm import generate_json
+
+from .store import load as load_discovered
 
 _SYS_CACHE = None
 

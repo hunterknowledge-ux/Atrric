@@ -24,11 +24,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.env_loader import load_env
+
 load_env()
 
 from core.ilmu_llm import IlmuLLM
 from core.store import _get_db
-
 
 PROGRESS_FILE = _ROOT / "ontology_progress.json"
 SAMPLE_SIZE = 20
@@ -240,7 +240,7 @@ def main():
     chunks = load_sample_chunks(SAMPLE_SIZE)
     print(f"Sample: {len(chunks)} chunks")
     print(f"Max iterations: {MAX_ITERATIONS}")
-    print(f"Est. cost: ~RM0.05\n")
+    print("Est. cost: ~RM0.05\n")
 
     start_iter, all_schemas = load_progress()
     if start_iter > 0:
@@ -279,7 +279,7 @@ def main():
 
     except KeyboardInterrupt:
         print("\n\n[!] Interrupted. Progress saved.")
-        print(f"    Run again untuk resume.")
+        print("    Run again untuk resume.")
 
     # Core attributes
     print("\n=== CORE ATTRIBUTES (muncul 3+ iterasi) ===")

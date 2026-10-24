@@ -7,9 +7,9 @@ Tidak sentuh store.py. Hanya wrap.
 import numpy as np
 from omnifuse.models import Chunk, ChunkMutationResult
 
+import config
 from core import embed as core_embed
 from core import store as core_store
-import config
 
 # Auto-detect dari config — elak mismatch bila tukar embedder
 _DIM = config.EMBED_DIM

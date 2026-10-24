@@ -18,11 +18,9 @@ import sys
 import time
 from pathlib import Path
 
+from report.generate import _build_narrative_prompt, generate_narrative
 from report.loader import load_all
 from report.picker import pick_all
-from report.generate import generate_narrative, _build_narrative_prompt
-from report.template import write_report
-
 
 # Rate assumption untuk estimate (ilmu-mini-v3.3)
 COST_PER_M_TOKEN_RM = 0.38

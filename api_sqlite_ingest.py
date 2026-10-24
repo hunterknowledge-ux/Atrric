@@ -1,7 +1,8 @@
-import subprocess
 import json
-import sqlite3
 import os
+import sqlite3
+import subprocess
+
 
 def fetch_api_data_curl(url):
     print(f"Fetching data via curl: {url}")
@@ -25,7 +26,7 @@ def fetch_api_data_curl(url):
         data = json.loads(result.stdout)
         return data
     except json.JSONDecodeError:
-        print(f"Response bukan JSON. Mungkin kena block atau rate limit.")
+        print("Response bukan JSON. Mungkin kena block atau rate limit.")
         print(f"Response preview: {result.stdout[:200]}")
         return None
     except Exception as e:

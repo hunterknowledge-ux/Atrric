@@ -16,9 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-from core.chunk import chunk_text
-from core.embed import embed, EmbedError
 from core import store as vector_store
+from core.chunk import chunk_text
+from core.embed import EmbedError, embed
 
 RAW_DIR = ROOT / "raw_data"
 MANIFEST_PATH = RAW_DIR / ".manifest.json"
@@ -99,7 +99,7 @@ def main():
     else:
         d = diff_files(manifest, current)
 
-    print(f"\n=== ATRRIC Ingest ===")
+    print("\n=== ATRRIC Ingest ===")
     print(f"Scan:  {RAW_DIR}")
     print(f"Found: {len(current)} file(s)\n")
     print(f"  New:     {len(d['new'])}")

@@ -1,11 +1,10 @@
 import json
-import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.ilmu_llm import IlmuLLM, IlmuError
+from core.ilmu_llm import IlmuError, IlmuLLM
 from core.router import get_model
 
 LLMError = IlmuError

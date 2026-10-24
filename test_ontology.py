@@ -1,9 +1,11 @@
 """Test ontology extraction — ILMU bge-m3 + xgen."""
 from core.env_loader import load_env
+
 load_env()
 
-from core.ilmu_llm import IlmuLLM
 import xgen_ontology_build as xo
+
+from core.ilmu_llm import IlmuLLM
 
 
 class IlmuLLMBig(IlmuLLM):

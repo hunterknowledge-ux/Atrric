@@ -9,7 +9,6 @@ then hard-split if needed. Respects chunk_size and overlap.
 import re
 import sys
 from pathlib import Path
-from typing import List
 
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -21,7 +20,7 @@ def chunk_text(
     text: str,
     chunk_size: int = None,
     overlap: int = None,
-) -> List[str]:
+) -> list[str]:
     """
     Split text into overlapping chunks.
 
@@ -58,7 +57,7 @@ def chunk_text(
     # Split by paragraphs first
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
-    chunks: List[str] = []
+    chunks: list[str] = []
     current = ""
 
     for para in paragraphs:
@@ -85,7 +84,7 @@ def chunk_text(
     return chunks
 
 
-def _hard_split(text: str, size: int, overlap: int) -> List[str]:
+def _hard_split(text: str, size: int, overlap: int) -> list[str]:
     """Hard-split long text by character, with overlap."""
     if size <= 0:
         return [text]
