@@ -40,29 +40,22 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-light); }
 
-  /* FIX: Z-INDEX STACKING */
-  #overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);
-    z-index: 90; display: none; opacity: 0; transition: opacity 0.2s;
-  }
+  /* OVERLAY & DRAWERS */
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); z-index: 90; display: none; opacity: 0; transition: opacity 0.2s; }
   #overlay.show { display: block; opacity: 1; }
 
-  .drawer {
-    position: fixed; top: 0; bottom: 0; z-index: 100; /* Lebih tinggi dari overlay */
-    background: var(--bg-panel); border-color: var(--border);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex; flex-direction: column;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  }
-  #sidebar-left { left: 0; width: 280px; border-right-width: 1px; transform: translateX(-100%); }
-  #sidebar-right { right: 0; width: 100%; max-width: 380px; border-left-width: 1px; transform: translateX(100%); }
+  .drawer { position: fixed; top: 0; bottom: 0; z-index: 100; background: var(--bg-panel); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  #sidebar-left { left: 0; width: 280px; border-right: 1px solid var(--border); transform: translateX(-100%); }
+  #sidebar-right { right: 0; width: 100%; max-width: 380px; border-left: 1px solid var(--border); transform: translateX(100%); }
   .drawer.open { transform: translateX(0) !important; }
 
-  .md-content { font-size: 14px; line-height: 1.6; color: #d4d4d8; }
-  .md-content p { margin-bottom: 12px; }
+  /* MARKDOWN STYLING */
+  .md-content { font-size: 13.5px; line-height: 1.65; color: #d4d4d8; }
+  .md-content p { margin-bottom: 14px; }
   .md-content strong { color: #fafafa; font-weight: 600; }
-  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 12px; }
-  .md-content li { margin-bottom: 4px; }
+  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 14px; }
+  .md-content li { margin-bottom: 6px; }
+  .md-content h1, .md-content h2, .md-content h3 { color: #fafafa; font-weight: 600; margin: 20px 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   .md-content code { font-family: var(--font-mono); background: #27272a; padding: 2px 4px; font-size: 12px; color: var(--accent); }
   
   .btn-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 4px; color: var(--text-muted); transition: all 0.15s; }
@@ -71,12 +64,11 @@
 </head>
 <body>
 
-  <!-- OVERLAY -->
   <div id="overlay" class="overlay" onclick="closeDrawers()"></div>
 
   <!-- LEFT DRAWER -->
-  <aside id="sidebar-left" class="drawer border-r">
-    <div class="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] shrink-0 bg-[var(--bg-panel)]">
+  <aside id="sidebar-left" class="drawer">
+    <div class="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] shrink-0">
       <span class="mono text-xs font-bold tracking-wider">WORKSPACE EXPLORER</span>
       <button onclick="closeDrawers()" class="btn-icon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -92,8 +84,8 @@
     </div>
   </aside>
 
-  <!-- RIGHT DRAWER -->
-  <aside id="sidebar-right" class="drawer border-l bg-[var(--bg-panel)]">
+  <!-- RIGHT DRAWER (AIP ASSIST) -->
+  <aside id="sidebar-right" class="drawer">
     <div class="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] shrink-0">
       <div class="flex items-center gap-2">
         <div class="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></div>
@@ -122,7 +114,6 @@
   <!-- MAIN APP -->
   <div class="flex-1 flex flex-col relative w-full h-full z-0">
     
-    <!-- TOP BAR -->
     <header class="h-12 shrink-0 flex items-center justify-between px-2 bg-[var(--bg-panel)] border-b border-[var(--border)] z-10">
       <div class="flex items-center gap-1">
         <button onclick="openLeft()" class="btn-icon" title="Explorer">
@@ -154,26 +145,35 @@
         <div class="mono text-[10px] text-[var(--text-muted)]">Select a report from explorer or open AIP Assist</div>
       </div>
 
-      <!-- ACTIVE REPORT -->
+      <!-- ACTIVE REPORT WORKSPACE -->
       <div id="report-container" class="hidden max-w-5xl mx-auto flex flex-col gap-4">
         
-        <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
-          <div class="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[#09090b]">
-            <div class="flex items-center gap-3">
-              <span class="mono text-[10px] text-[var(--text-muted)]">ID:</span>
-              <span class="mono text-[11px] text-[var(--accent)]" id="r-id">---</span>
-            </div>
-            <div class="flex items-center gap-3 mono text-[10px]">
-              <span class="text-[var(--text-muted)]" id="r-time">--:--</span>
-              <span class="px-1.5 py-0.5 border border-green-900 text-green-500 bg-green-950/30">COMPILED</span>
-            </div>
+        <!-- TOP METRICS (Palantir Data Block) -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
+             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Report ID</div>
+             <div class="mono text-lg text-[var(--accent)]" id="r-id">---</div>
           </div>
-          <div class="p-4">
-            <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Query Directive</div>
-            <div class="text-sm font-medium" id="r-query">...</div>
+          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
+             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Word Count</div>
+             <div class="mono text-lg" id="r-words">0</div>
+          </div>
+          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
+             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Status</div>
+             <div class="mono text-lg text-green-500">COMPILED</div>
           </div>
         </div>
 
+        <!-- QUERY DIRECTIVE -->
+        <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
+          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
+            <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Query Directive</span>
+            <span class="mono text-[10px] text-[var(--text-muted)]" id="r-time">--:--</span>
+          </div>
+          <div class="p-4 text-sm font-medium" id="r-query">...</div>
+        </div>
+
+        <!-- GENERATED ANALYSIS -->
         <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
           <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
             <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Generated Analysis</span>
@@ -184,6 +184,7 @@
           </div>
         </div>
 
+        <!-- EVIDENCE ARTIFACTS -->
         <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm mb-10">
           <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
             <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Evidence Artifacts</span>
@@ -206,7 +207,6 @@
       </div>
     </main>
 
-    <!-- BOTTOM STATUS BAR -->
     <footer class="h-8 shrink-0 flex items-center px-3 border-t border-[var(--border)] bg-[var(--bg-panel)] mono text-[9px] text-[var(--text-muted)]">
       <div class="flex items-center gap-4">
         <span class="hidden sm:inline">WORKSPACE: ACTIVE</span>
@@ -219,7 +219,6 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  
   let history = [];
   let isBusy = false;
 
@@ -258,10 +257,12 @@
     $('empty-canvas').style.display = 'none';
     $('report-container').classList.remove('hidden');
     
-    $('r-id').textContent = 'LOADING...';
+    // Reset UI state
+    $('r-id').textContent = 'LOAD...';
+    $('r-words').textContent = '0';
     $('r-query').textContent = q;
     $('r-time').textContent = '--:--';
-    $('r-answer').innerHTML = '<div class="mono text-[var(--accent)] animate-pulse">> INITIATING RAG PIPELINE...</div>';
+    $('r-answer').innerHTML = '<div class="mono text-[var(--accent)] animate-pulse py-4">> INITIATING RAG PIPELINE...</div>';
     $('evidence-table-body').innerHTML = '';
     
     try {
@@ -270,15 +271,21 @@
       
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
 
+      const answerText = data.answer || 'Tiada jawapan.';
       const id = Math.random().toString(36).substring(2, 7).toUpperCase();
       const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      
+      const wordCount = answerText.split(/\s+/).length;
+
+      // Populate metrics
       $('r-id').textContent = id;
+      $('r-words').textContent = wordCount;
       $('r-time').textContent = time;
       
-      const rawHTML = marked.parse(data.answer || 'Tiada jawapan.');
+      // Render Markdown
+      const rawHTML = marked.parse(answerText);
       $('r-answer').innerHTML = DOMPurify.sanitize(rawHTML);
 
+      // Render Table
       const sources = data.sources || [];
       $('t-src').textContent = `SRC: ${sources.length}`;
       
@@ -304,11 +311,11 @@
         });
       }
       
-      history.unshift({ id, time, q, answer: data.answer, sources });
+      history.unshift({ id, time, q, answer: answerText, sources, wordCount });
       renderHistory();
 
     } catch (e) {
-      $('r-id').textContent = 'ERROR';
+      $('r-id').textContent = 'ERR';
       $('r-answer').innerHTML = `<div class="mono text-red-400 border border-red-900 bg-red-950/20 p-3 rounded-sm">SYSTEM ERROR: ${e.message}</div>`;
       $('evidence-table-body').innerHTML = '';
     } finally {
@@ -322,7 +329,7 @@
     if (history.length === 0) return;
     
     list.innerHTML = '';
-    history.forEach((item, index) => {
+    history.forEach((item) => {
       const btn = document.createElement('button');
       btn.className = 'w-full text-left p-2 border-b border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors group mb-1 rounded-sm';
       btn.innerHTML = `
@@ -345,6 +352,7 @@
     $('report-container').classList.remove('hidden');
     
     $('r-id').textContent = item.id;
+    $('r-words').textContent = item.wordCount || 0;
     $('r-time').textContent = item.time;
     $('r-query').textContent = item.q;
     
