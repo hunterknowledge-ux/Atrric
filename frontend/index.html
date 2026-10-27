@@ -3,13 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>ATRRIC | Intel Workspace</title>
+<title>ATRRIC | Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
   :root {
     --bg-app: #09090b;
@@ -40,385 +38,233 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-light); }
 
-  /* OVERLAY & DRAWERS */
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); z-index: 90; display: none; opacity: 0; transition: opacity 0.2s; }
-  #overlay.show { display: block; opacity: 1; }
-
-  .drawer { position: fixed; top: 0; bottom: 0; z-index: 100; background: var(--bg-panel); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-  #sidebar-left { left: 0; width: 280px; border-right: 1px solid var(--border); transform: translateX(-100%); }
-  #sidebar-right { right: 0; width: 100%; max-width: 380px; border-left: 1px solid var(--border); transform: translateX(100%); }
-  .drawer.open { transform: translateX(0) !important; }
-
-  /* INTEL WORKSPACE GRID */
-  .intel-grid { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); }
-  @media (min-width: 768px) {
-    .intel-grid { grid-template-columns: 2fr 1fr; }
+  /* GRID LAYOUT (Mobile First, Desktop Multi-Pane) */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    height: 100%;
   }
-  .intel-cell { background: var(--bg-panel); padding: 16px; }
+  @media (min-width: 1024px) {
+    .dashboard-grid {
+      grid-template-columns: 300px 1fr 300px;
+      height: calc(100dvh - 80px); /* adjust for header/footer */
+    }
+  }
 
-  /* MARKDOWN STYLING (Dense & Sharp) */
-  .md-content { font-size: 13px; line-height: 1.6; color: #d4d4d8; }
-  .md-content p { margin-bottom: 12px; }
-  .md-content strong { color: #fafafa; font-weight: 600; }
-  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 12px; }
-  .md-content li { margin-bottom: 6px; }
-  .md-content h1, .md-content h2, .md-content h3 { color: #fafafa; font-weight: 600; margin: 16px 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-  .md-content code { font-family: var(--font-mono); background: #27272a; padding: 2px 4px; font-size: 11px; color: var(--accent); }
-  
-  /* ENTITY TAGS */
-  .entity-tag { display: inline-block; font-family: var(--font-mono); font-size: 10px; color: var(--accent); border: 1px solid var(--border-light); padding: 2px 6px; margin: 0 4px 4px 0; background: var(--bg-app); }
+  .panel-cell {
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-  .btn-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 4px; color: var(--text-muted); transition: all 0.15s; }
-  .btn-icon:hover { background: var(--bg-hover); color: var(--text-main); }
+  .panel-header {
+    background: #09090b;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-content {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* DATA VISUALIZATION */
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; }
+  .bar-label { width: 100px; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+  .bar-track { flex: 1; height: 6px; background: var(--border); }
+  .bar-fill { height: 100%; background: var(--accent); }
+  .bar-val { width: 30px; text-align: right; color: var(--text-main); }
+
+  .stat-box { border: 1px solid var(--border); padding: 8px; margin-bottom: 8px; }
+  .stat-val { font-size: 20px; font-family: var(--font-mono); font-weight: bold; margin-top: 4px; }
 </style>
 </head>
 <body>
 
-  <div id="overlay" class="overlay" onclick="closeDrawers()"></div>
+  <!-- TOP BAR -->
+  <header class="h-12 shrink-0 flex items-center justify-between px-4 bg-[var(--bg-panel)] border-b border-[var(--border)]">
+    <div class="flex items-center gap-3">
+      <div class="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></div>
+      <span class="mono text-sm font-bold tracking-widest">ATRRIC COMMAND CENTER</span>
+    </div>
+    <div class="flex items-center gap-4 mono text-[10px] text-[var(--text-muted)]">
+      <span>SYS: <span class="text-green-500">ONLINE</span></span>
+      <span id="clock">00:00:00</span>
+    </div>
+  </header>
 
-  <!-- LEFT DRAWER -->
-  <aside id="sidebar-left" class="drawer">
-    <div class="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] shrink-0">
-      <span class="mono text-xs font-bold tracking-wider">WORKSPACE EXPLORER</span>
-      <button onclick="closeDrawers()" class="btn-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="p-3 border-b border-[var(--border)]">
-      <button onclick="openAssistant(); clearCanvas();" class="w-full flex items-center justify-center gap-2 bg-[var(--accent)] text-black mono text-xs font-bold py-2 rounded-sm hover:opacity-90 transition">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> NEW QUERY
-      </button>
-    </div>
-    <div class="flex-1 overflow-y-auto p-2" id="history-list">
-      <div class="mono text-[10px] text-[var(--text-muted)] text-center mt-4">NO RECENT REPORTS</div>
-    </div>
-  </aside>
-
-  <!-- RIGHT DRAWER (AIP ASSIST) -->
-  <aside id="sidebar-right" class="drawer">
-    <div class="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] shrink-0">
-      <div class="flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></div>
-        <span class="mono text-xs font-bold tracking-wider text-acc">AIP ASSIST</span>
-      </div>
-      <button onclick="closeDrawers()" class="btn-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    
-    <div class="flex-1 p-4 overflow-y-auto flex flex-col gap-4 mono text-xs">
-      <div class="text-[var(--text-muted)] leading-relaxed">System ready. Enter command below to generate intelligence report.</div>
-    </div>
-
-    <div class="p-3 border-t border-[var(--border)]" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
-      <div class="border border-[var(--border-light)] bg-[var(--bg-app)] flex items-center px-2 py-1 rounded-sm focus-within:border-[var(--accent)] transition-colors">
-        <span class="text-[var(--accent)] font-bold mr-2">></span>
-        <input type="text" id="cmd-input" class="w-full bg-transparent outline-none mono text-sm placeholder-[var(--text-muted)] text-[var(--text-main)]" placeholder="enter query..." autocomplete="off">
-        <button onclick="executeQuery()" class="text-[var(--text-muted)] hover:text-[var(--accent)] p-1">
-           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 7-7 7 7M12 19V5"/></svg>
-        </button>
-      </div>
-    </div>
-  </aside>
-
-  <!-- MAIN APP -->
-  <div class="flex-1 flex flex-col relative w-full h-full z-0">
-    
-    <header class="h-12 shrink-0 flex items-center justify-between px-2 bg-[var(--bg-panel)] border-b border-[var(--border)] z-10">
-      <div class="flex items-center gap-1">
-        <button onclick="openLeft()" class="btn-icon" title="Explorer">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
-        <div class="h-4 w-px bg-[var(--border)] mx-1"></div>
-        <span class="mono text-xs font-bold tracking-widest ml-1">ATRRIC</span>
-      </div>
+  <!-- MAIN DASHBOARD -->
+  <main class="flex-1 p-2 sm:p-4 overflow-y-auto bg-[var(--bg-app)]">
+    <div class="dashboard-grid">
       
-      <div class="hidden sm:flex items-center gap-4 mono text-[9px] text-[var(--text-muted)]">
-        <span>SYS: <span class="text-green-500">OK</span></span>
-        <span id="t-src">SRC: 0</span>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <button onclick="openRight()" class="btn-icon" title="AIP Assist">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- MAIN CANVAS -->
-    <main class="flex-1 overflow-auto bg-[var(--bg-app)] relative p-2 sm:p-4" id="main-canvas">
-      
-      <!-- Empty State -->
-      <div id="empty-canvas" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1" class="mb-4"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-        <div class="mono text-sm text-[var(--text-main)] mb-1">NO ACTIVE WORKSPACE</div>
-        <div class="mono text-[10px] text-[var(--text-muted)]">Select a report from explorer or open AIP Assist</div>
-      </div>
-
-      <!-- ACTIVE REPORT WORKSPACE (2-COLUMN INTEL GRID) -->
-      <div id="report-container" class="hidden max-w-6xl mx-auto flex flex-col gap-4">
-        
-        <!-- TOP METRICS (Palantir Data Block) -->
-        <div class="grid grid-cols-3 gap-2">
-          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
-             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Report ID</div>
-             <div class="mono text-lg text-[var(--accent)]" id="r-id">---</div>
-          </div>
-          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
-             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Processing</div>
-             <div class="mono text-lg" id="r-time">--:--</div>
-          </div>
-          <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
-             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Status</div>
-             <div class="mono text-lg text-green-500">COMPILED</div>
-          </div>
+      <!-- LEFT PANEL (Data Sources / Spatial) -->
+      <div class="panel-cell">
+        <div class="panel-header">
+          <span>Spatial Intelligence</span>
+          <span class="text-[var(--accent)]">ID: S-01</span>
         </div>
-
-        <!-- QUERY DIRECTIVE -->
-        <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
-          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b]">
-            <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Query Directive</span>
-          </div>
-          <div class="p-3 text-sm font-medium text-[var(--text-main)]" id="r-query">...</div>
+        <div class="panel-content" id="spatial-list">
+          <div class="mono text-[10px] text-[var(--text-muted)]">Loading spatial data...</div>
         </div>
+      </div>
 
-        <!-- INTEL GRID (The core change) -->
-        <div class="intel-grid rounded-sm">
+      <!-- CENTER PANEL (Analytics & Summary) -->
+      <div class="panel-cell border-x border-[var(--border)]">
+        <div class="panel-header">
+          <span>Systemic Analytics (RAG Output)</span>
+        </div>
+        <div class="panel-content flex flex-col gap-6">
           
-          <!-- LEFT COL: The Text (Executive Summary & Details) -->
-          <div class="intel-cell relative">
-            <div class="flex items-center justify-between border-b border-[var(--border)] pb-2 mb-3">
-               <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Generated Analysis</span>
-               <button onclick="copyText()" class="mono text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)]">[ COPY ]</button>
-            </div>
-            <div id="r-answer" class="md-content"></div>
-          </div>
-
-          <!-- RIGHT COL: Metadata & Extracted Entities -->
-          <div class="intel-cell bg-[#0c0c0e]">
-            
-            <!-- Extracted Entities (Dynamic from text) -->
-            <div class="mb-4">
-              <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-2">Extracted Entities</div>
-              <div id="r-entities" class="flex flex-wrap">
-                <span class="mono text-[10px] text-[var(--text-muted)]">Scanning...</span>
+          <!-- SENTIMENT -->
+          <div>
+            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">SENTIMENT ANALYSIS</div>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="stat-box">
+                <div class="mono text-[9px] text-[var(--text-muted)]">POSITIVE</div>
+                <div class="stat-val text-green-500" id="sent-pos">0</div>
+              </div>
+              <div class="stat-box">
+                <div class="mono text-[9px] text-[var(--text-muted)]">NEUTRAL</div>
+                <div class="stat-val text-gray-400" id="sent-neu">0</div>
+              </div>
+              <div class="stat-box">
+                <div class="mono text-[9px] text-[var(--text-muted)]">NEGATIVE</div>
+                <div class="stat-val text-red-500" id="sent-neg">0</div>
               </div>
             </div>
-
-            <!-- Evidence Table -->
-            <div>
-              <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-2">Evidence Artifacts</div>
-              <div class="flex flex-col gap-2" id="evidence-list">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-
           </div>
+
+          <!-- TOP TOPICS -->
+          <div>
+            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">TOP TOPICS</div>
+            <div id="topics-list"></div>
+          </div>
+
+          <!-- TOP ENTITIES -->
+          <div>
+            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">ENTITY FREQUENCY</div>
+            <div id="entities-list"></div>
+          </div>
+
         </div>
-        
-        <div class="h-10"></div> <!-- Spacer -->
       </div>
-    </main>
 
-    <footer class="h-8 shrink-0 flex items-center px-3 border-t border-[var(--border)] bg-[var(--bg-panel)] mono text-[9px] text-[var(--text-muted)]">
-      <div class="flex items-center gap-4">
-        <span class="hidden sm:inline">WORKSPACE: ACTIVE</span>
-        <span>MEM: <span id="mem-status">OK</span></span>
+      <!-- RIGHT PANEL (Trigger / News) -->
+      <div class="panel-cell">
+        <div class="panel-header">
+          <span>Trigger Events (News)</span>
+          <span class="text-[var(--accent)]">ID: T-01</span>
+        </div>
+        <div class="panel-content" id="news-list">
+          <div class="mono text-[10px] text-[var(--text-muted)]">Loading news data...</div>
+        </div>
       </div>
-    </footer>
 
-  </div>
+    </div>
+  </main>
+
+  <!-- BOTTOM BAR -->
+  <footer class="h-8 shrink-0 flex items-center px-4 border-t border-[var(--border)] bg-[var(--bg-panel)] mono text-[9px] text-[var(--text-muted)] justify-between">
+    <span>WORKSPACE: ANALYTICS</span>
+    <span>DATA SOURCE: LOCAL DB + RAG</span>
+  </footer>
 
 <script>
 (() => {
-  const $ = id => document.getElementById(id);
-  let history = [];
-  let isBusy = false;
+  // Jam
+  setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toTimeString().split(' ')[0];
+  }, 1000);
 
-  const overlay = $('overlay');
-  window.openLeft = () => { $('sidebar-left').classList.add('open'); overlay.classList.add('show'); };
-  window.openRight = () => { $('sidebar-right').classList.add('open'); overlay.classList.add('show'); setTimeout(() => $('cmd-input').focus(), 250); };
-  window.openAssistant = () => { window.openRight(); };
-  window.closeDrawers = () => { 
-    $('sidebar-left').classList.remove('open'); 
-    $('sidebar-right').classList.remove('open'); 
-    overlay.classList.remove('show'); 
-  };
-
-  window.clearCanvas = () => {
-    $('empty-canvas').style.display = 'flex';
-    $('report-container').classList.add('hidden');
-    $('cmd-input').value = '';
-  };
-
-  window.copyText = () => {
-    const text = $('r-answer').innerText;
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = event.target;
-      btn.textContent = '[ COPIED ]';
-      setTimeout(() => btn.textContent = '[ COPY ]', 1500);
-    });
-  };
-
-  // Function to extract "entities" (Proper Nouns / Uppercase words) from text
-  function extractEntities(text) {
-    // Cari perkataan yang bermula dengan huruf besar (minimum 3 huruf), buang perkataan biasa Melayu/Inggeris
-    const stopwords = ['Yang', 'Dan', 'Dengan', 'Untuk', 'Ini', 'Itu', 'Ada', 'Dari', 'Pada', 'Dalam', 'The', 'And', 'This', 'That', 'For', 'With'];
-    const words = text.match(/\b[A-Z][a-zA-Z]{2,}\b/g) || [];
+  // Fungsi buat Bar Chart
+  function renderBarList(containerId, data, labelKey, valueKey) {
+    const el = document.getElementById(containerId);
+    if (!data || data.length === 0) {
+      el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
+      return;
+    }
     
-    // Kira kekerapan
-    const counts = {};
-    words.forEach(w => {
-      if (!stopwords.includes(w)) counts[w] = (counts[w] || 0) + 1;
-    });
+    // Cari nilai maksimum untuk kira peratus
+    const maxVal = Math.max(...data.map(d => d[valueKey]));
     
-    // Ambil top 6 entity
-    return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 6);
+    el.innerHTML = data.map(d => {
+      const pct = (d[valueKey] / maxVal) * 100;
+      return `
+        <div class="bar-row">
+          <div class="bar-label">${d[labelKey]}</div>
+          <div class="bar-track"><div class="bar-fill" style="width: ${pct}%"></div></div>
+          <div class="bar-val">${d[valueKey]}</div>
+        </div>
+      `;
+    }).join('');
   }
 
-  window.executeQuery = async () => {
-    const q = $('cmd-input').value.trim();
-    if (!q || isBusy) return;
-    
-    isBusy = true;
-    closeDrawers();
-    
-    $('empty-canvas').style.display = 'none';
-    $('report-container').classList.remove('hidden');
-    
-    $('r-id').textContent = 'LOAD...';
-    $('r-time').textContent = 'WAIT';
-    $('r-query').textContent = q;
-    $('r-answer').innerHTML = '<div class="mono text-[var(--accent)] animate-pulse py-4">> INITIATING RAG PIPELINE...</div>';
-    $('r-entities').innerHTML = '<span class="mono text-[10px] text-[var(--text-muted)]">Scanning...</span>';
-    $('evidence-list').innerHTML = '';
-    
+  // Fetch Data Dashboard
+  async function loadDashboard() {
     try {
-      const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
+      const res = await fetch('/api/dashboard');
       const data = await res.json();
-      
-      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
 
-      const answerText = data.answer || 'Tiada jawapan.';
-      const id = Math.random().toString(36).substring(2, 7).toUpperCase();
-      const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      // 1. Populate Sentiment
+      const sent = data.summary?.by_sentiment || {};
+      document.getElementById('sent-pos').textContent = sent.positive || 0;
+      document.getElementById('sent-neu').textContent = sent.neutral || 0;
+      document.getElementById('sent-neg').textContent = sent.negative || 0;
 
-      $('r-id').textContent = id;
-      $('r-time').textContent = time;
-      
-      // Render Markdown
-      const rawHTML = marked.parse(answerText);
-      $('r-answer').innerHTML = DOMPurify.sanitize(rawHTML);
+      // 2. Populate Topics (Bar chart)
+      const topics = data.summary?.by_topic || {};
+      const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] })).slice(0, 6);
+      renderBarList('topics-list', topicsArr, 'name', 'count');
 
-      // Extract Entities & Render
-      const entities = extractEntities(answerText);
-      $('r-entities').innerHTML = entities.length > 0 
-        ? entities.map(e => `<span class="entity-tag">${e}</span>`).join('') 
-        : '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
+      // 3. Populate Entities (Bar chart)
+      const entities = data.summary?.top_entities || [];
+      renderBarList('entities-list', entities.slice(0, 6), 'name', 'count');
 
-      // Render Evidence in Right Column (as stacked buttons)
-      const sources = data.sources || [];
-      $('t-src').textContent = `SRC: ${sources.length}`;
-      
-      if (sources.length === 0) {
-        $('evidence-list').innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO EVIDENCE</div>';
+      // 4. Populate Spatial (Left Panel)
+      const spatialEl = document.getElementById('spatial-list');
+      if (data.spatial && data.spatial.length > 0) {
+        spatialEl.innerHTML = data.spatial.map(s => `
+          <div class="flex justify-between border-b border-[var(--border)] py-2 mono text-xs">
+             <span class="text-[var(--text-main)]">${s.district}</span>
+             <span class="text-[var(--accent)]">${(s.population/1000).toFixed(1)}k</span>
+          </div>
+        `).join('');
       } else {
-        sources.forEach((src, i) => {
-          const match = src.match(/^(.*?)\s*\((\d*\.?\d+)\)\s*$/);
-          const name = match ? match[1] : src;
-          const score = match ? match[2] : '---';
-
-          const btn = document.createElement('button');
-          btn.className = 'w-full text-left border border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--accent)] transition-colors p-2 rounded-sm flex flex-col gap-1 group';
-          btn.innerHTML = `
-            <div class="flex justify-between items-center w-full">
-               <span class="mono text-[10px] text-[var(--text-muted)] group-hover:text-[var(--text-main)]">00${i+1}</span>
-               <span class="mono text-[9px] text-[var(--accent)] bg-[#09090b] border border-[var(--border)] px-1">CONF: ${score}</span>
-            </div>
-            <div class="mono text-[11px] text-[var(--text-main)] truncate w-full">> ${name}</div>
-          `;
-          $('evidence-list').appendChild(btn);
-        });
+        spatialEl.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO SPATIAL DATA</div>';
       }
-      
-      history.unshift({ id, time, q, answer: answerText, sources, entities });
-      renderHistory();
+
+      // 5. Populate News (Right Panel)
+      const newsEl = document.getElementById('news-list');
+      if (data.news && data.news.length > 0) {
+        newsEl.innerHTML = data.news.map(n => `
+          <div class="border-l-2 border-[var(--border-light)] pl-2 py-1 mb-2 mono text-[10px] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text-main)] transition-colors">
+            ${n.title}
+          </div>
+        `).join('');
+      } else {
+        newsEl.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO NEWS DATA</div>';
+      }
 
     } catch (e) {
-      $('r-id').textContent = 'ERR';
-      $('r-answer').innerHTML = `<div class="mono text-red-400 border border-red-900 bg-red-950/20 p-3 rounded-sm">SYSTEM ERROR: ${e.message}</div>`;
-      $('evidence-list').innerHTML = '';
-      $('r-entities').innerHTML = '';
-    } finally {
-      isBusy = false;
-      $('cmd-input').value = '';
+      console.error("Dashboard Error:", e);
+      document.getElementById('spatial-list').innerHTML = `<div class="text-red-500 mono text-[10px]">ERROR: ${e.message}</div>`;
     }
-  };
-
-  function renderHistory() {
-    const list = $('history-list');
-    if (history.length === 0) return;
-    
-    list.innerHTML = '';
-    history.forEach((item) => {
-      const btn = document.createElement('button');
-      btn.className = 'w-full text-left p-2 border-b border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors group mb-1 rounded-sm';
-      btn.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="mono text-[10px] text-[var(--accent)]">[ ${item.id} ]</span>
-          <span class="mono text-[9px] text-[var(--text-muted)]">${item.time}</span>
-        </div>
-        <div class="mono text-[11px] text-[var(--text-main)] truncate">${item.q}</div>
-      `;
-      btn.onclick = () => {
-        loadReport(item);
-        closeDrawers();
-      };
-      list.appendChild(btn);
-    });
   }
 
-  function loadReport(item) {
-    $('empty-canvas').style.display = 'none';
-    $('report-container').classList.remove('hidden');
-    
-    $('r-id').textContent = item.id;
-    $('r-time').textContent = item.time;
-    $('r-query').textContent = item.q;
-    
-    const rawHTML = marked.parse(item.answer || 'Tiada jawapan.');
-    $('r-answer').innerHTML = DOMPurify.sanitize(rawHTML);
-    
-    const entities = item.entities || [];
-    $('r-entities').innerHTML = entities.length > 0 
-        ? entities.map(e => `<span class="entity-tag">${e}</span>`).join('') 
-        : '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
-
-    $('evidence-list').innerHTML = '';
-    const sources = item.sources || [];
-    sources.forEach((src, i) => {
-        const match = src.match(/^(.*?)\s*\((\d*\.?\d+)\)\s*$/);
-        const name = match ? match[1] : src;
-        const score = match ? match[2] : '---';
-
-        const btn = document.createElement('button');
-        btn.className = 'w-full text-left border border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--accent)] transition-colors p-2 rounded-sm flex flex-col gap-1 group';
-        btn.innerHTML = `
-          <div class="flex justify-between items-center w-full">
-             <span class="mono text-[10px] text-[var(--text-muted)] group-hover:text-[var(--text-main)]">00${i+1}</span>
-             <span class="mono text-[9px] text-[var(--accent)] bg-[#09090b] border border-[var(--border)] px-1">CONF: ${score}</span>
-          </div>
-          <div class="mono text-[11px] text-[var(--text-main)] truncate w-full">> ${name}</div>
-        `;
-        $('evidence-list').appendChild(btn);
-    });
-  }
-
-  $('cmd-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') executeQuery();
-  });
-
-  clearCanvas();
+  loadDashboard();
 
 })();
 </script>
