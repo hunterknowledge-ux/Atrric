@@ -91,7 +91,7 @@
   /* --- LEAFLET TACTICAL STYLES --- */
   #map { width: 100%; height: 100%; background: #05070A; z-index: 1; }
   
-  /* Hologram Grid Overlay (Pointer-events none so we can still drag the map) */
+  /* Hologram Grid Overlay */
   .map-overlay {
     position: absolute; inset: 0; pointer-events: none; z-index: 400;
     background-image: 
@@ -183,7 +183,7 @@
             <div class="mt-2 text-red-500 animate-pulse">● LIVE OSM DATA LINKED</div>
           </div>
           
-          <div class="map-hud bottom-4 right-4 text-right">
+          <div class="map-hud bottom-4 right-4 text-right pr-12 pb-2">
             <div>ENGINE: LEAFLET.JS</div>
             <div>DATA: OVERPASS API (OSM)</div>
             <div id="hud-buildings" class="text-white mt-1">SCANNING BUILDINGS...</div>
@@ -275,7 +275,6 @@
     const view = $(`view-${id}`);
     if(view) view.classList.remove('hidden');
     
-    // Refresh map size if switching to map (fix grey tile bug)
     if(id === 'map' && map) { setTimeout(() => map.invalidateSize(), 100); }
   };
 
@@ -308,39 +307,29 @@
 
   // --- INITIALIZE LEAFLET MAP ---
   function initMap() {
-    // Center map on Selangor (Shah Alam / KL area)
     map = L.map('map', {
-      zoomControl: false, // Hide default zoom, we'll add our own or use pinch
+      zoomControl: false,
       attributionControl: false
     }).setView([3.0738, 101.5183], 10);
 
-    // Add Dark Matter Tile Layer (CartoDB) - Free, No API Key
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd'
+    // Guna Esri Dark Gray (Free, No API Key)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16
     }).addTo(map);
 
-    // Track Mouse Movement for HUD
     map.on('mousemove', function(e) {
       $('hud-coords').textContent = `LAT: ${e.latlng.lat.toFixed(4)} N, LON: ${e.latlng.lng.toFixed(4)} E`;
     });
 
-    // Add Zoom Control at Bottom Right
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Fetch Live Buildings from Overpass API
     fetchLiveBuildings();
   }
 
   // --- OVERPASS API (LIVE OSM DATA) ---
   async function fetchLiveBuildings() {
     $('hud-buildings').textContent = "SCANNING AREA...";
-    
-    // Bounding box for Selangor area (approx) - to avoid overloading API
-    // Format: [south, west, north, east]
     const bbox = "2.9,101.3,3.3,101.8"; 
-    
-    // Query: Get buildings that are under construction
     const query = `
       [out:json][timeout:25];
       (
@@ -356,26 +345,20 @@
         body: query
       });
       const data = await res.json();
-      
       let countCon = 0;
       let countDone = 0;
 
-      // Loop through each building found
       data.elements.forEach(el => {
         if (!el.geometry) return;
-        
-        // Convert OSM geometry to Leaflet LatLngs
         const latlngs = el.geometry.map(pt => [pt.lat, pt.lon]);
         const isConstruction = el.tags && el.tags.building === 'construction';
         
-        // Style: Red for construction, Cyan for completed
         const color = isConstruction ? '#ef4444' : '#22d3ee';
         const fillColor = isConstruction ? '#7f1d1d' : '#164e63';
         
         if (isConstruction) countCon++;
         else countDone++;
 
-        // Draw polygon on map
         L.polygon(latlngs, {
           color: color,
           weight: 1,
@@ -405,7 +388,6 @@
       const res = await fetch('/api/dashboard');
       const data = await res.json();
 
-      // Overview Tab
       const sent = data.summary?.by_sentiment || {};
       $('sent-pos').textContent = sent.positive || 0;
       $('sent-neu').textContent = sent.neutral || 0;
@@ -415,7 +397,6 @@
       const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] }));
       renderChart('topic-chart', topicsArr, 'name', 'count');
 
-      // Sidebar Data
       const navSp = $('nav-spatial');
       if (data.spatial && data.spatial.length) {
         navSp.innerHTML = data.spatial.map(s => `
