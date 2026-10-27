@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>ATRRIC | Spatial Wrapper</title>
+<title>ATRRIC | Spatial Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 
-<!-- MAPLIBRE GL JS (PENGGANTI LEAFLET - LEBIH LAJU UNTUK DATA BANYAK) -->
+<!-- MAPLIBRE GL JS (WEBGL / GPU) -->
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
@@ -116,6 +116,10 @@
     font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important;
   }
   .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #0F141C !important; }
+
+  /* Tag Style */
+  .tag-btn { background: #1F2E3D; color: var(--accent); padding: 2px 8px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border-light); display: inline-block; margin: 2px; transition: all 0.2s; font-size: 10px; font-family: var(--font-mono); }
+  .tag-btn:hover { background: var(--accent); color: #05070A; }
 </style>
 </head>
 <body>
@@ -194,7 +198,7 @@
             </div>
             <div class="flex flex-col gap-4">
               <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
-                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2 border-b border-[var(--border)] pb-2">Top Entities</div>
+                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2 border-b border-[var(--border)] pb-2">Top Entities (Click to Query)</div>
                  <div id="entity-tags" class="flex flex-wrap gap-1"></div>
               </div>
             </div>
@@ -208,6 +212,7 @@
     <aside id="sidebar-right" class="sidebar sidebar-right">
       <div class="h-8 border-b border-[var(--border)] flex items-center justify-between px-3 mono text-[10px] bg-[var(--bg-header)]">
         <span class="text-[var(--accent)] font-bold">AIP ASSIST</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></div>
       </div>
       <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-3 mono text-[11px]" id="chat-history">
         <div class="text-[var(--text-muted)]">System ready. Type a query to generate an intelligence report.</div>
@@ -228,11 +233,10 @@
 (() => {
   const $ = id => document.getElementById(id);
   let isBusy = false;
+  let map;
 
-  // Clock
   setInterval(() => { $('clock').textContent = new Date().toTimeString().split(' ')[0]; }, 1000);
 
-  // Drawer logic
   window.toggleDrawer = (side) => {
     const el = side === 'left' ? $('sidebar-left') : $('sidebar-right');
     const isOpen = el.classList.contains('open');
@@ -245,7 +249,6 @@
     $('overlay').classList.remove('show');
   };
 
-  // Tab logic
   window.switchTab = (id) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
@@ -254,7 +257,6 @@
     const view = $(`view-${id}`);
     if(view) view.classList.remove('hidden');
     
-    // Refresh map size bila tukar tab
     if(id === 'map' && map) { setTimeout(() => map.resize(), 100); }
   };
 
@@ -270,55 +272,40 @@
   }
 
   // --- INITIALIZE MAPLIBRE (GPU RENDER) ---
-  let map;
   function initMap() {
-    // MapLibre guna WebGL, render jutaan polygon pun tak lag
     map = new maplibregl.Map({
       container: 'map',
-      style: 'https://tiles.openfreemap.org/styles/liberty', // Dark/Liberty style percuma
-      center: [101.5183, 3.0738], // [Lng, Lat] - Perhatian: MapLibre guna Lng dulu
-      zoom: 12,
-      pitch: 45, // 3D Tilt (God's Eye View)
-      bearing: -10, // Rotate sikit untuk nampak tactical
-      antialias: false, // OFF untuk prestasi phone 2GB
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      center: [101.6869, 3.1390], // KLCC
+      zoom: 14.5,
+      pitch: 60,
+      bearing: -20,
+      antialias: false,
       attributionControl: false
     });
 
-    // Add Zoom Control
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
-    // Update HUD coords
     map.on('mousemove', (e) => {
       $('hud-coords').textContent = `LAT: ${e.lngLat.lat.toFixed(4)} N, LON: ${e.lngLat.lng.toFixed(4)} E`;
     });
 
-    // Bila map siap load base tiles, baru tarik data Overpass
     map.on('load', () => {
-      // Customize style supaya nampak gelap (obsidian)
-      const layers = map.getStyle().layers;
-      layers.forEach(layer => {
-        if (layer.type === 'background') {
-          map.setPaintProperty(layer.id, 'background-color', '#05070A');
-        }
-      });
-
       fetchLiveBuildings();
     });
 
-    // Tarik data baru bila peta berhenti gerak
     map.on('moveend', () => {
         if (map.getZoom() > 13) fetchLiveBuildings();
     });
   }
 
-  // --- OVERPASS API DATA INJECTION (GEOJSON) ---
+  // --- OVERPASS API DATA INJECTION (WITH MOCK FALLBACK) ---
   async function fetchLiveBuildings() {
     $('hud-buildings').textContent = "SCANNING VIEWPORT...";
     
     const bounds = map.getBounds();
     const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
     
-    // Query kecil untuk construction site
     const query = `
       [out:json][timeout:15];
       way["building"="construction"](${bbox});
@@ -327,9 +314,9 @@
     
     try {
       const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+      if (!res.ok) throw new Error("API Error");
       const data = await res.json();
       
-      // Convert OSM format ke GeoJSON (Piawaian MapLibre)
       const features = data.elements.map(el => {
         if (!el.geometry) return null;
         return {
@@ -343,34 +330,47 @@
       }).filter(Boolean);
 
       const geojson = { type: 'FeatureCollection', features: features };
-
-      // Buang layer lama kalau ada
-      if (map.getSource('construction-data')) {
-        map.getSource('construction-data').setData(geojson);
-      } else {
-        // Add sumber data
-        map.addSource('construction-data', { type: 'geojson', data: geojson });
-        
-        // Add 3D Extrusion Layer (Bangunan timbul)
-        map.addLayer({
-          'id': 'construction-3d',
-          'type': 'fill-extrusion',
-          'source': 'construction-data',
-          'paint': {
-            'fill-extrusion-color': '#ef4444', // Merah
-            'fill-extrusion-height': 50, // Tinggi bangunan (simulasi)
-            'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.8
-          }
-        });
-      }
-
-      $('hud-buildings').innerHTML = `FOUND: <span class="text-red-500">${features.length} SITES</span>`;
+      renderBuildingsOnMap(geojson, features.length);
 
     } catch (e) {
-      console.error(e);
-      $('hud-buildings').innerHTML = `<span class="text-yellow-500">API TIMEOUT / BUSY</span>`;
+      console.error("Overpass API Failed. Using Mock Data.", e);
+      loadMockData();
     }
+  }
+
+  function renderBuildingsOnMap(geojson, count) {
+    if (map.getSource('construction-data')) {
+      map.getSource('construction-data').setData(geojson);
+    } else {
+      map.addSource('construction-data', { type: 'geojson', data: geojson });
+      map.addLayer({
+        'id': 'construction-3d',
+        'type': 'fill-extrusion',
+        'source': 'construction-data',
+        'paint': {
+          'fill-extrusion-color': '#ef4444',
+          'fill-extrusion-height': 80,
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.85
+        }
+      });
+    }
+    $('hud-buildings').innerHTML = `LIVE DATA: <span class="text-red-500">${count} SITES</span>`;
+  }
+
+  function loadMockData() {
+    $('hud-buildings').innerHTML = `<span class="text-yellow-500">SIMULATED DATA (API DOWN)</span>`;
+    
+    // Bangunan 3D palsu di sekitar KLCC
+    const mockFeatures = [
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.686, 3.138], [101.687, 3.138], [101.687, 3.139], [101.686, 3.139]]] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.688, 3.137], [101.689, 3.137], [101.689, 3.138], [101.688, 3.138]]] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.685, 3.140], [101.686, 3.140], [101.686, 3.141], [101.685, 3.141]]] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.690, 3.139], [101.691, 3.139], [101.691, 3.140], [101.690, 3.140]]] } }
+    ];
+
+    const geojson = { type: 'FeatureCollection', features: mockFeatures };
+    renderBuildingsOnMap(geojson, mockFeatures.length);
   }
 
   // --- DASHBOARD DATA ---
@@ -378,6 +378,7 @@
     try {
       const res = await fetch('/api/dashboard');
       const data = await res.json();
+
       const sent = data.summary?.by_sentiment || {};
       $('sent-pos').textContent = sent.positive || 0;
       $('sent-neu').textContent = sent.neutral || 0;
@@ -385,8 +386,10 @@
 
       const topics = data.summary?.by_topic || {};
       const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] }));
-      // ... (fungsi renderBarChart dan renderTags sama macam semalam)
-      
+      renderBarChart('topic-chart', topicsArr, 'name', 'count');
+
+      renderTags('entity-tags', data.summary?.top_entities, 'name');
+
       const navSp = $('nav-spatial');
       if (data.spatial && data.spatial.length) {
         navSp.innerHTML = data.spatial.map(s => `
@@ -396,8 +399,144 @@
           </div>
         `).join('');
       }
+
+      const navNews = $('nav-news');
+      if (data.news && data.news.length) {
+        navNews.innerHTML = data.news.map((n, i) => `
+          <div class="nav-item" onclick="openNews(${i}, '${n.title.replace(/'/g, "\\'")}')">
+            <span class="truncate w-4/5">${n.title}</span>
+            <span class="text-[var(--text-muted)]">></span>
+          </div>
+        `).join('');
+      }
     } catch (e) { console.error(e); }
   }
+
+  function renderBarChart(containerId, data, labelKey, valueKey) {
+    const el = $(containerId);
+    if (!data || data.length === 0) return el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
+    const maxVal = Math.max(...data.map(d => d[valueKey]));
+    el.innerHTML = data.slice(0, 8).map(d => {
+      const pct = (d[valueKey] / maxVal) * 100;
+      return `
+        <div class="flex items-center gap-2 mono text-[10px] mb-1">
+          <div class="w-28 truncate text-[var(--text-muted)]">${d[labelKey]}</div>
+          <div class="flex-1 h-2 bg-[#090D13]"><div class="h-full bg-[var(--accent)]" style="width: ${pct}%"></div></div>
+          <div class="w-8 text-right">${d[valueKey]}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderTags(containerId, data, keyName) {
+    const el = $(containerId);
+    if (!data || data.length === 0) return el.innerHTML = '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
+    el.innerHTML = data.map(d => `<span class="tag-btn" onclick="triggerQuery('${d[keyName]}')">${d[keyName].toUpperCase()} [${d.count}]</span>`).join('');
+  }
+
+  window.triggerQuery = (term) => {
+    $('cmd-input').value = `Analisa isu berkaitan ${term}`;
+    executeQuery();
+  };
+
+  window.openSpatial = (district, pop) => {
+    closeDrawers();
+    const id = 'spatial-' + district.replace(/\s+/g, '-').toLowerCase();
+    if (!$(id)) {
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto bg-[var(--bg-app)] z-50';
+      view.innerHTML = `
+        <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-2xl mx-auto">
+          <div class="mono text-[10px] text-[var(--accent)] mb-2">[ SPATIAL TARGET: ${district.toUpperCase()} ]</div>
+          <div class="text-2xl font-mono mb-4">${pop.toLocaleString()} <span class="text-xs text-[var(--text-muted)]">Gen Z</span></div>
+          <div class="mono text-[10px] text-[var(--text-muted)] mt-4">Data Source: atrric_macro.db</div>
+        </div>
+      `;
+      container.appendChild(view);
+      createTab(id, `S: ${district.substring(0,10)}`);
+    }
+    switchTab(id);
+  };
+
+  window.openNews = (idx, title) => {
+    closeDrawers();
+    const id = 'news-' + idx;
+    if (!$(id)) {
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto bg-[var(--bg-app)] z-50';
+      view.innerHTML = `
+        <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-3xl mx-auto">
+          <div class="mono text-[10px] text-red-400 mb-2">[ TRIGGER EVENT DETECTED ]</div>
+          <h2 class="text-lg font-medium text-white mb-4">${title}</h2>
+          <div class="mono text-[10px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2">Status: Raw Intel</div>
+        </div>
+      `;
+      container.appendChild(view);
+      createTab(id, `T: ${title.substring(0,10)}...`);
+    }
+    switchTab(id);
+  };
+
+  window.executeQuery = async () => {
+    const q = $('cmd-input').value.trim();
+    if (!q || isBusy) return;
+    isBusy = true; $('cmd-input').value = '';
+    
+    if (!document.getElementById('sidebar-right').classList.contains('open')) {
+      if(window.innerWidth < 768) toggleDrawer('right');
+    }
+
+    const chat = $('chat-history');
+    chat.innerHTML += `<div class="text-[var(--accent)] mt-2">> ${q}</div>`;
+    chat.innerHTML += `<div id="chat-loading" class="text-[var(--text-muted)] animate-pulse">Compiling intelligence...</div>`;
+    chat.scrollTop = chat.scrollHeight;
+    
+    if(window.innerWidth < 768) closeDrawers();
+
+    try {
+      const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      
+      const loadingEl = $('chat-loading');
+      if(loadingEl) loadingEl.remove();
+      
+      chat.innerHTML += `<div class="text-[var(--text-main)] border-l border-[var(--border)] pl-2">Report compiled.</div>`;
+      chat.scrollTop = chat.scrollHeight;
+
+      const id = 'report-' + Date.now();
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden bg-[var(--bg-app)] z-50';
+      const answer = data.answer || 'Tiada jawapan.';
+      
+      // Note: marked.js dan dompurify mungkin tak include dalam snippet ni sebab kita fokus UI
+      // Kalau kau nak render markdown, pastikan library tu ada kat head. Kalau tak, guna .innerText
+      view.innerHTML = `
+        <div class="h-full flex flex-col">
+          <div class="bg-[var(--bg-header)] border-b border-[var(--border)] p-3 flex justify-between items-center shrink-0">
+             <span class="mono text-[10px] text-[var(--accent)] uppercase">[ REPORT: ${q} ]</span>
+             <button onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.textContent='[ COPIED ]'; setTimeout(()=>this.textContent='[ COPY ]', 1500)" class="mono text-[10px] text-[var(--text-muted)] hover:text-white">[ COPY ]</button>
+             <div class="hidden">${answer}</div>
+          </div>
+          <div class="flex-1 overflow-y-auto md-content whitespace-pre-wrap">${answer}</div>
+        </div>
+      `;
+      container.appendChild(view);
+      createTab(id, `RPT: ${q.substring(0,10)}...`);
+      switchTab(id);
+    } catch (e) {
+      const loadingEl = $('chat-loading');
+      if(loadingEl) loadingEl.remove();
+      chat.innerHTML += `<div class="text-red-500 mt-2">ERROR: ${e.message}</div>`;
+    } finally { isBusy = false; }
+  };
+
+  $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') executeQuery(); });
 
   // Boot
   initMap();
