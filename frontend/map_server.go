@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// Struct ni untuk hantar balik ke frontend
 type WSMessage struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
@@ -17,46 +16,42 @@ type WSMessage struct {
 }
 
 func main() {
-	fmt.Println("[ATRRIC] Live Spatial Go Server running on :8081")
-	
-	// Handle WebSocket connection
+	fmt.Println("[ATRRIC] Live Building Tracker running on :8081")
 	http.HandleFunc("/ws", handleWebSocket)
-	
 	log.Fatal(http.ListenAndServe("127.0.0.1:8081", nil))
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Kita guna HTTP Polling fallback sementara sebab WebSocket library
-	// memerlukan external package (gorilla/websocket). 
-	// Untuk pure stdlib Go, kita buat Server-Sent Events (SSE) atau Polling.
-	// Tapi supaya kau boleh test sekarang tanpa install package luar, 
-	// kita guna standard JSON API yang di-poll oleh frontend.
-	
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
 	lat := r.URL.Query().Get("lat")
 	lng := r.URL.Query().Get("lng")
+	
+	// Radius 5KM (untuk elak timeout)
+	radius := "5000"
 
 	if lat == "" || lng == "" {
 		http.Error(w, `{"error":"missing coordinates"}`, 400)
 		return
 	}
 
-	data := fetchOverpass(lat, lng)
+	data := fetchBuildings(lat, lng, radius)
 	json.NewEncoder(w).Encode(data)
 }
 
-func fetchOverpass(lat, lng string) WSMessage {
-	// Query kecil sekitar koordinat
+func fetchBuildings(lat, lng, radius string) WSMessage {
+	// QUERY PENTING: Ambil SEMUA bangunan yang ada "name"
 	query := fmt.Sprintf(`
-		[out:json][timeout:10];
-		way["building"="construction"](around:2000,%s,%s);
-		out geom 50;
-	`, lat, lng)
+		[out:json][timeout:20];
+		(
+		  way["building"]["name"](around:%s,%s,%s);
+		  way["building:construction"]["name"](around:%s,%s,%s);
+		);
+		out geom 150;
+	`, radius, lat, lng, radius, lat, lng)
 
-	resp, err := http.Post("https://overpass-api.de/api/interpreter", "text/plain", 
-		&stringReader{query, 0})
+	resp, err := http.Post("https://overpass-api.de/api/interpreter", "text/plain", &stringReader{query, 0})
 	
 	if err != nil {
 		return WSMessage{Type: "error", Data: err.Error(), Time: time.Now().Format("15:04:05")}
@@ -75,7 +70,6 @@ func fetchOverpass(lat, lng string) WSMessage {
 	}
 }
 
-// Simple custom string reader untuk POST body
 type stringReader struct {
 	s string
 	i int64
