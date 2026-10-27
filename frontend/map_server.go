@@ -1,85 +1,57 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-type WSMessage struct {
-	Type string      `json:"type"`
-	Data interface{} `json:"data"`
-	Time string      `json:"time"`
+type Building struct {
+	ID       int64   `json:"id"`
+	Name     string  `json:"name"`
+	Height   float64 `json:"height"`
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
 }
 
 func main() {
-	fmt.Println("[ATRRIC] Live Building Tracker running on :8081")
-	http.HandleFunc("/ws", handleWebSocket)
+	fmt.Println("[ATRRIC] Spatial Go Engine running on :8081")
+	http.HandleFunc("/api/buildings", handleBuildings)
 	log.Fatal(http.ListenAndServe("127.0.0.1:8081", nil))
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+func handleBuildings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
-	lat := r.URL.Query().Get("lat")
-	lng := r.URL.Query().Get("lng")
-	
-	// Radius 5KM (untuk elak timeout)
-	radius := "5000"
-
-	if lat == "" || lng == "" {
-		http.Error(w, `{"error":"missing coordinates"}`, 400)
+	db, err := sql.Open("sqlite3", "./spatial_cache.db")
+	if err != nil {
+		http.Error(w, `{"error":"DB Error"}`, 500)
 		return
 	}
+	defer db.Close()
 
-	data := fetchBuildings(lat, lng, radius)
-	json.NewEncoder(w).Encode(data)
-}
-
-func fetchBuildings(lat, lng, radius string) WSMessage {
-	// QUERY PENTING: Ambil SEMUA bangunan yang ada "name"
-	query := fmt.Sprintf(`
-		[out:json][timeout:20];
-		(
-		  way["building"]["name"](around:%s,%s,%s);
-		  way["building:construction"]["name"](around:%s,%s,%s);
-		);
-		out geom 150;
-	`, radius, lat, lng, radius, lat, lng)
-
-	resp, err := http.Post("https://overpass-api.de/api/interpreter", "text/plain", &stringReader{query, 0})
-	
+	// Ambil maksimum 200 bangunan untuk elak crash phone
+	rows, err := db.Query("SELECT id, name, height, lat, lon FROM buildings LIMIT 200")
 	if err != nil {
-		return WSMessage{Type: "error", Data: err.Error(), Time: time.Now().Format("15:04:05")}
+		http.Error(w, `{"error":"Query Error"}`, 500)
+		return
 	}
-	defer resp.Body.Close()
+	defer rows.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	
-	var raw map[string]interface{}
-	json.Unmarshal(body, &raw)
-
-	return WSMessage{
-		Type: "geojson",
-		Data: raw["elements"],
-		Time: time.Now().Format("15:04:05"),
+	var buildings []Building
+	for rows.Next() {
+		var b Building
+		rows.Scan(&b.ID, &b.Name, &b.Height, &b.Lat, &b.Lon)
+		buildings = append(buildings, b)
 	}
-}
 
-type stringReader struct {
-	s string
-	i int64
-}
-
-func (r *stringReader) Read(b []byte) (n int, err error) {
-	if r.i >= int64(len(r.s)) {
-		return 0, fmt.Errorf("EOF")
-	}
-	n = copy(b, r.s[r.i:])
-	r.i += int64(n)
-	return
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"type": "geojson",
+		"data": buildings,
+	})
 }
