@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>ATRRIC | Spatial Correlation Engine</title>
+<title>ATRRIC | Correlation Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -13,15 +13,10 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
 <style>
-  :root {
-    --bg-app: #05070A; --bg-panel: #0F141C; --bg-header: #090D13;
-    --border: #1F2E3D; --border-light: #334155; --text-main: #E2E8F0;
-    --text-muted: #64748B; --accent: #22d3ee; --font-mono: 'JetBrains Mono', monospace;
-  }
+  :root { --bg-app: #05070A; --bg-panel: #0F141C; --bg-header: #090D13; --border: #1F2E3D; --border-light: #334155; --text-main: #E2E8F0; --text-muted: #64748B; --accent: #22d3ee; --font-mono: 'JetBrains Mono', monospace; }
   body { background-color: var(--bg-app); color: var(--text-main); font-family: 'Inter', sans-serif; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; margin: 0; }
   .mono { font-family: var(--font-mono); }
-  .text-acc { color: var(--accent); }
-
+  
   .app-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
   .sidebar { background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; width: 280px; z-index: 1000; transition: transform 0.3s; }
   .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
@@ -38,17 +33,14 @@
   .nav-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-family: var(--font-mono); font-size: 11px; display: flex; justify-content: space-between; }
   .nav-item:hover { background: var(--bg-header); color: var(--accent); }
 
-  /* MAPLIBRE UI */
   #map { width: 100%; height: 100%; background: #05070A; z-index: 1; }
   .map-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 400; background-image: linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px); background-size: 40px 40px; }
-  .scanlines { position: absolute; inset: 0; pointer-events: none; z-index: 401; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; opacity: 0.3; }
   .map-hud { position: absolute; z-index: 500; pointer-events: none; font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-shadow: 0 0 5px rgba(34,211,238,0.5); }
 
   .maplibregl-popup-content { background: #0F141C !important; color: #E2E8F0 !important; border: 1px solid #1F2E3D !important; border-radius: 2px !important; font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important; }
   .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #0F141C !important; }
 
   .cmd-box { border: 1px solid var(--border-light); background: var(--bg-app); display: flex; align-items: center; padding: 4px 8px; }
-  .cmd-box:focus-within { border-color: var(--accent); }
   .cmd-input { background: transparent; border: none; outline: none; color: var(--text-main); width: 100%; font-family: var(--font-mono); font-size: 12px; }
   .tag-btn { background: #1F2E3D; color: var(--accent); padding: 2px 8px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border-light); display: inline-block; margin: 2px; font-size: 10px; font-family: var(--font-mono); }
 </style>
@@ -86,7 +78,6 @@
     <main class="main-canvas">
       <div class="tab-bar" id="tab-bar">
         <div class="tab-btn active" data-target="map" onclick="switchTab('map')">[ LIVE MAP ]</div>
-        <div class="tab-btn" data-target="analytics" onclick="switchTab('analytics')">[ CORRELATION ]</div>
       </div>
 
       <div class="flex-1 overflow-hidden relative" id="canvas-content">
@@ -94,28 +85,18 @@
         <div id="view-map" class="view-section absolute inset-0">
           <div id="map"></div>
           <div class="map-overlay"></div>
-          <div class="scanlines"></div>
           
           <div class="map-hud top-4 left-4">
-            <div class="text-[var(--accent)] mb-1 font-bold">[ LIVE SPATIAL TRACKER ]</div>
-            <div>ZONE: LEMBAH KLANG</div>
+            <div class="text-[var(--accent)] mb-1 font-bold">[ SPATIAL CORRELATION ]</div>
             <div id="hud-coords">LAT: 3.07 N, LON: 101.51 E</div>
-            <div class="mt-2 text-red-500 animate-pulse">● LIVE OSM DATA</div>
+            <div class="mt-2 text-red-500 animate-pulse">● SQLITE CACHE LINKED</div>
           </div>
           
           <div class="map-hud bottom-4 right-4 text-right pr-12 pb-2">
             <div>ENGINE: MAPLIBRE (WEBGL)</div>
-            <div>DATA: OVERPASS + GO SERVER</div>
-            <div id="hud-buildings" class="text-white mt-1 text-yellow-400">SCANNING...</div>
+            <div>DATA: GO + SQLITE</div>
+            <div id="hud-buildings" class="text-white mt-1 text-yellow-400">LOADING...</div>
           </div>
-        </div>
-
-        <div id="view-analytics" class="view-section absolute inset-0 p-4 hidden overflow-y-auto">
-            <!-- Tempat untuk data analitik korrelasi kau nanti -->
-            <div class="text-center mt-20 text-[var(--text-muted)] mono">
-                [ CORRELATION ENGINE ]<br>
-                Select a Spatial Zone from the left to correlate with Gen Z Issues.
-            </div>
         </div>
 
         <div id="dynamic-views"></div>
@@ -188,10 +169,10 @@
       container: 'map',
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [101.6869, 3.1390], // KLCC
-      zoom: 14,
+      zoom: 13,
       pitch: 60,
       bearing: -20,
-      antialias: true, // ON kan balik untuk detail
+      antialias: true,
       attributionControl: false
     });
 
@@ -202,121 +183,71 @@
     });
 
     map.on('load', () => {
-      fetchLiveBuildings();
-    });
-
-    map.on('moveend', () => {
-        if (map.getZoom() > 13) fetchLiveBuildings();
+      fetchCachedBuildings();
     });
   }
 
-  // --- OVERPASS API DATA INJECTION ---
-  async function fetchLiveBuildings() {
-    $('hud-buildings').textContent = "SCANNING AREA...";
-    const bounds = map.getBounds();
-    const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
-    
-    // Query lebih banyak data, filter yang ada nama je
-    const query = `
-      [out:json][timeout:20];
-      (
-        way["building"]["name"](${bbox});
-        way["building:construction"]["name"](${bbox});
-      );
-      out geom 200;
-    `;
+  // --- FETCH FROM GO SERVER (SQLITE) ---
+  async function fetchCachedBuildings() {
+    $('hud-buildings').textContent = "LOADING CACHE...";
     
     try {
-      // Hantar ke Go Server (Port 8081)
-      const res = await fetch(`http://127.0.0.1:8081/ws?lat=${map.getCenter().lat}&lng=${map.getCenter().lng}`);
-      
+      const res = await fetch(`http://127.0.0.1:8081/api/buildings`);
       if (!res.ok) throw new Error("Go Server Error");
       const payload = await res.json();
       
-      if (payload.type === 'error') throw new Error(payload.data);
-      
-      const features = payload.data.map(el => {
-        if (!el.geometry) return null;
-        
-        const tags = el.tags || {};
-        const name = tags.name || 'UNNAMED';
-        const isConstruction = tags.building === 'construction' || tags['building:construction'];
-        
-        // Kira ketinggian (kalau ada)
-        let height = 15; 
-        if (tags['building:levels']) height = parseInt(tags['building:levels']) * 3;
-        else if (tags.height) height = parseFloat(tags.height);
-
-        return {
-          type: 'Feature',
-          properties: { id: el.id, name: name, height: height, is_con: isConstruction },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [el.geometry.map(pt => [pt.lon, pt.lat])]
-          }
-        };
-      }).filter(Boolean);
+      const features = payload.data.map(b => ({
+        type: 'Feature',
+        properties: { id: b.id, name: b.name, height: b.height },
+        geometry: { type: 'Point', coordinates: [b.lon, b.lat] }
+      }));
 
       const geojson = { type: 'FeatureCollection', features: features };
-      renderBuildingsOnMap(geojson, features.length);
+      
+      if (map.getSource('building-data')) {
+        map.getSource('building-data').setData(geojson);
+      } else {
+        map.addSource('building-data', { type: 'geojson', data: geojson });
+        map.addLayer({
+          'id': 'buildings-3d',
+          'type': 'circle',
+          'source': 'building-data',
+          'paint': {
+            'circle-radius': ['get', 'height'], // Radius ikut ketinggian
+            'circle-color': '#ef4444',
+            'circle-opacity': 0.7,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff'
+          }
+        });
+
+        map.on('click', 'buildings-3d', (e) => {
+          const p = e.features[0].properties;
+          new maplibregl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="font-family: monospace; font-size: 11px;">
+                <b>Name:</b> ${p.name}<br>
+                <b>Height:</b> ${p.height}m<br>
+                <a href="https://www.openstreetmap.org/way/${p.id}" target="_blank" style="color: #22d3ee;">[ TRACE TO OSM ]</a>
+              </div>
+            `).addTo(map);
+        });
+      }
+
+      $('hud-buildings').innerHTML = `CACHED: <span class="text-[var(--accent)]">${features.length} SITES</span>`;
       
     } catch (e) {
-      console.error("Error:", e);
-      $('hud-buildings').innerHTML = `<span class="text-red-500">API TIMEOUT</span>`;
-      // loadMockData(); // Kau boleh nyalakan ni kalau nak demo masa API down
+      $('hud-buildings').innerHTML = `<span class="text-red-500">DB OFFLINE. RUN GO SERVER.</span>`;
     }
   }
 
-  function renderBuildingsOnMap(geojson, count) {
-    if (map.getSource('construction-data')) {
-      map.getSource('construction-data').setData(geojson);
-    } else {
-      map.addSource('construction-data', { type: 'geojson', data: geojson });
-      
-      // Render 3D dengan warna berbeza
-      map.addLayer({
-        'id': 'buildings-3d',
-        'type': 'fill-extrusion',
-        'source': 'construction-data',
-        'paint': {
-          'fill-extrusion-color': [
-            'case',
-            ['==', ['get', 'is_con'], true], '#ef4444', // Merah: Construction
-            '#22d3ee' // Cyan: Siap
-          ],
-          'fill-extrusion-height': ['get', 'height'],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.85
-        }
-      });
-
-      map.on('click', 'buildings-3d', (e) => {
-        const p = e.features[0].properties;
-        new maplibregl.Popup()
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <div style="font-family: monospace; font-size: 11px;">
-              <strong style="color: ${p.is_con ? '#ef4444' : '#22d3ee'};">
-                  ${p.is_con ? '⚠ UNDER CONSTRUCTION' : '✓ COMPLETED'}
-              </strong><br>
-              <b>Name:</b> ${p.name}<br>
-              <b>Height:</b> ${p.height}m<br>
-              <a href="https://www.openstreetmap.org/way/${p.id}" target="_blank" style="color: #22d3ee;">[ TRACE TO OSM ]</a>
-            </div>
-          `)
-          .addTo(map);
-      });
-    }
-    $('hud-buildings').innerHTML = `TRACKED: <span class="text-[var(--accent)]">${count} BUILDINGS</span>`;
-  }
-
-  // --- SIDEBAR & CORRELATION LOGIC ---
+  // --- SIDEBAR CORRELATION ---
   async function loadDashboard() {
     try {
-      const res = await fetch('/api/dashboard');
+      const res = await fetch('/api/dashboard'); // Python Server
       const data = await res.json();
 
-      // Spatial zones kat kiri
       const navSp = $('nav-spatial');
       if (data.spatial && data.spatial.length) {
         navSp.innerHTML = data.spatial.map(s => `
@@ -327,7 +258,6 @@
         `).join('');
       }
 
-      // Gen Z issues (Entities) kat kiri
       const navIssues = $('nav-issues');
       if (data.summary?.top_entities) {
         navIssues.innerHTML = data.summary.top_entities.map(e => `
@@ -338,21 +268,16 @@
     } catch (e) { console.error(e); }
   }
 
-  // Bila user klik Zone kat kiri
+  // Bila klik Zon (Kaitkan dengan LLM)
   window.correlateZone = (district, pop) => {
     closeDrawers();
-    
-    // 1. Auto-zoom map ke zone tu (Kita simulate je la sebab takde exact coords)
-    // Untuk demo, kita zoom ke KLCC dulu
     map.flyTo({ center: [101.6869, 3.1390], zoom: 13, pitch: 60 });
-    
-    // 2. Auto-query AIP Assist
     const query = `Analisa kaitan antara pembangunan di ${district} (Populasi Gen Z: ${pop}) dengan isu ekonomi dan sosial Gen Z.`;
     $('cmd-input').value = query;
     executeQuery();
   };
 
-  // Bila user klik Issue (PTPTN, Kerajaan, dll) kat kiri
+  // Bila klik Isu (Kaitkan dengan LLM)
   window.correlateIssue = (issue) => {
     closeDrawers();
     const query = `Cari kaitan spatial antara isu ${issue} dengan taburan penduduk Gen Z di Selangor.`;
