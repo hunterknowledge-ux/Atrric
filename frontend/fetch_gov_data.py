@@ -26,26 +26,27 @@ STATE_COORDS = {
     'Labuan': (5.2833, 115.2333), 'Putrajaya': (2.9264, 101.6964),
 }
 
-print("⏳ Mencari dataset MIDA di archive.data.gov.my...")
+print("⏳ Mencari dataset MIDA guna api.data.gov.my (CKAN)...")
 
 try:
-    # LANGKAH 1: Cari dataset guna package_search (bukan package_show)
-    search_url = "https://archive.data.gov.my/api/3/action/package_search?q=MANUFACTURING+PROJECTS+APPROVED+BY+STATE"
+    # Guna api.data.gov.my (bukan archive)
+    base_url = "https://api.data.gov.my/api/3/action"
+    
+    # Cari dataset
+    search_url = f"{base_url}/package_search?q=manufacturing+projects"
     search_data = json.loads(fetch_url(search_url).decode('utf-8'))
     
     if not search_data['success'] or not search_data['result']['results']:
-        raise Exception("Dataset tak jumpa dalam carian.")
+        raise Exception("Dataset tak jumpa.")
     
-    # Ambil dataset pertama yang paling relevan
     dataset = search_data['result']['results'][0]
     dataset_id = dataset['id']
-    print(f"📌 Jumpa dataset: {dataset['title']} (ID: {dataset_id})")
+    print(f"📌 Jumpa: {dataset['title']}")
     
-    # LANGKAH 2: Guna package_show dengan ID yang betul untuk dapatkan senarai fail
-    show_url = f"https://archive.data.gov.my/api/3/action/package_show?id={dataset_id}"
+    # Dapatkan resources
+    show_url = f"{base_url}/package_show?id={dataset_id}"
     show_data = json.loads(fetch_url(show_url).decode('utf-8'))
     
-    # Cari fail CSV dalam resources
     csv_url = None
     for res in show_data['result']['resources']:
         if res.get('format', '').upper() == 'CSV':
@@ -53,18 +54,16 @@ try:
             break
     
     if not csv_url:
-        raise Exception("Dataset ni takde fail CSV.")
+        raise Exception("Takde CSV.")
     
-    print(f"📥 Downloading CSV dari: {csv_url}")
+    print(f"📥 Downloading: {csv_url}")
     content = fetch_url(csv_url).decode('utf-8', errors='ignore')
     
-    # LANGKAH 3: Baca CSV dan masukkan ke SQLite
     reader = csv.DictReader(io.StringIO(content))
     print(f"📋 Kolum: {reader.fieldnames}")
     
     count = 0
     for i, row in enumerate(reader):
-        # Cari kolum negeri (nama mungkin 'State', 'state', 'Negeri', dll)
         state_val = ''
         for key in row.keys():
             if key and ('state' in key.lower() or 'negeri' in key.lower()):
@@ -74,24 +73,20 @@ try:
         if not state_val:
             continue
         
-        # Padankan dengan koordinat
         for k, (lat, lon) in STATE_COORDS.items():
             if k.lower() in state_val.lower():
-                # Offset sikit supaya tak bertindih
                 lat += (random.random() - 0.5) * 0.15
                 lon += (random.random() - 0.5) * 0.15
-                
                 proj_name = f"MIDA Project - {state_val}"
                 c.execute("INSERT OR REPLACE INTO real_projects (id, name, type, lat, lon) VALUES (?, ?, ?, ?, ?)",
                           (f"mida_{i}", proj_name, "Industrial Zone", lat, lon))
                 count += 1
                 break
     
-    print(f"✅ MIDA: {count} projek dimasukkan.")
+    print(f"✅ {count} projek dimasukkan.")
     
 except Exception as e:
     print(f"❌ Error: {e}")
 
 conn.commit()
 conn.close()
-print("🎯 Siap!")
