@@ -49,15 +49,25 @@
   #sidebar-right { right: 0; width: 100%; max-width: 380px; border-left: 1px solid var(--border); transform: translateX(100%); }
   .drawer.open { transform: translateX(0) !important; }
 
-  /* MARKDOWN STYLING */
-  .md-content { font-size: 13.5px; line-height: 1.65; color: #d4d4d8; }
-  .md-content p { margin-bottom: 14px; }
+  /* INTEL WORKSPACE GRID */
+  .intel-grid { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  @media (min-width: 768px) {
+    .intel-grid { grid-template-columns: 2fr 1fr; }
+  }
+  .intel-cell { background: var(--bg-panel); padding: 16px; }
+
+  /* MARKDOWN STYLING (Dense & Sharp) */
+  .md-content { font-size: 13px; line-height: 1.6; color: #d4d4d8; }
+  .md-content p { margin-bottom: 12px; }
   .md-content strong { color: #fafafa; font-weight: 600; }
-  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 14px; }
+  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 12px; }
   .md-content li { margin-bottom: 6px; }
-  .md-content h1, .md-content h2, .md-content h3 { color: #fafafa; font-weight: 600; margin: 20px 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-  .md-content code { font-family: var(--font-mono); background: #27272a; padding: 2px 4px; font-size: 12px; color: var(--accent); }
+  .md-content h1, .md-content h2, .md-content h3 { color: #fafafa; font-weight: 600; margin: 16px 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .md-content code { font-family: var(--font-mono); background: #27272a; padding: 2px 4px; font-size: 11px; color: var(--accent); }
   
+  /* ENTITY TAGS */
+  .entity-tag { display: inline-block; font-family: var(--font-mono); font-size: 10px; color: var(--accent); border: 1px solid var(--border-light); padding: 2px 6px; margin: 0 4px 4px 0; background: var(--bg-app); }
+
   .btn-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 4px; color: var(--text-muted); transition: all 0.15s; }
   .btn-icon:hover { background: var(--bg-hover); color: var(--text-main); }
 </style>
@@ -145,8 +155,8 @@
         <div class="mono text-[10px] text-[var(--text-muted)]">Select a report from explorer or open AIP Assist</div>
       </div>
 
-      <!-- ACTIVE REPORT WORKSPACE -->
-      <div id="report-container" class="hidden max-w-5xl mx-auto flex flex-col gap-4">
+      <!-- ACTIVE REPORT WORKSPACE (2-COLUMN INTEL GRID) -->
+      <div id="report-container" class="hidden max-w-6xl mx-auto flex flex-col gap-4">
         
         <!-- TOP METRICS (Palantir Data Block) -->
         <div class="grid grid-cols-3 gap-2">
@@ -155,8 +165,8 @@
              <div class="mono text-lg text-[var(--accent)]" id="r-id">---</div>
           </div>
           <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
-             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Word Count</div>
-             <div class="mono text-lg" id="r-words">0</div>
+             <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Processing</div>
+             <div class="mono text-lg" id="r-time">--:--</div>
           </div>
           <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-3 rounded-sm flex flex-col justify-between h-20">
              <div class="mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Status</div>
@@ -166,44 +176,47 @@
 
         <!-- QUERY DIRECTIVE -->
         <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
-          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
+          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b]">
             <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Query Directive</span>
-            <span class="mono text-[10px] text-[var(--text-muted)]" id="r-time">--:--</span>
           </div>
-          <div class="p-4 text-sm font-medium" id="r-query">...</div>
+          <div class="p-3 text-sm font-medium text-[var(--text-main)]" id="r-query">...</div>
         </div>
 
-        <!-- GENERATED ANALYSIS -->
-        <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm">
-          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
-            <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Generated Analysis</span>
-            <button onclick="copyText()" class="mono text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)]">[ COPY ]</button>
-          </div>
-          <div class="p-4 sm:p-6">
+        <!-- INTEL GRID (The core change) -->
+        <div class="intel-grid rounded-sm">
+          
+          <!-- LEFT COL: The Text (Executive Summary & Details) -->
+          <div class="intel-cell relative">
+            <div class="flex items-center justify-between border-b border-[var(--border)] pb-2 mb-3">
+               <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Generated Analysis</span>
+               <button onclick="copyText()" class="mono text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)]">[ COPY ]</button>
+            </div>
             <div id="r-answer" class="md-content"></div>
           </div>
-        </div>
 
-        <!-- EVIDENCE ARTIFACTS -->
-        <div class="border border-[var(--border)] bg-[var(--bg-panel)] rounded-sm mb-10">
-          <div class="px-3 py-2 border-b border-[var(--border)] bg-[#09090b] flex justify-between items-center">
-            <span class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Evidence Artifacts</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-[var(--border)] bg-[#09090b]">
-                  <th class="py-2 px-3 mono text-[10px] font-medium text-[var(--text-muted)] w-12">#</th>
-                  <th class="py-2 px-3 mono text-[10px] font-medium text-[var(--text-muted)]">Source File</th>
-                  <th class="py-2 px-3 mono text-[10px] font-medium text-[var(--text-muted)] w-24 text-right">Confidence</th>
-                  <th class="py-2 px-3 mono text-[10px] font-medium text-[var(--text-muted)] w-20 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody id="evidence-table-body"></tbody>
-            </table>
+          <!-- RIGHT COL: Metadata & Extracted Entities -->
+          <div class="intel-cell bg-[#0c0c0e]">
+            
+            <!-- Extracted Entities (Dynamic from text) -->
+            <div class="mb-4">
+              <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-2">Extracted Entities</div>
+              <div id="r-entities" class="flex flex-wrap">
+                <span class="mono text-[10px] text-[var(--text-muted)]">Scanning...</span>
+              </div>
+            </div>
+
+            <!-- Evidence Table -->
+            <div>
+              <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-2">Evidence Artifacts</div>
+              <div class="flex flex-col gap-2" id="evidence-list">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
           </div>
         </div>
-
+        
+        <div class="h-10"></div> <!-- Spacer -->
       </div>
     </main>
 
@@ -247,6 +260,22 @@
     });
   };
 
+  // Function to extract "entities" (Proper Nouns / Uppercase words) from text
+  function extractEntities(text) {
+    // Cari perkataan yang bermula dengan huruf besar (minimum 3 huruf), buang perkataan biasa Melayu/Inggeris
+    const stopwords = ['Yang', 'Dan', 'Dengan', 'Untuk', 'Ini', 'Itu', 'Ada', 'Dari', 'Pada', 'Dalam', 'The', 'And', 'This', 'That', 'For', 'With'];
+    const words = text.match(/\b[A-Z][a-zA-Z]{2,}\b/g) || [];
+    
+    // Kira kekerapan
+    const counts = {};
+    words.forEach(w => {
+      if (!stopwords.includes(w)) counts[w] = (counts[w] || 0) + 1;
+    });
+    
+    // Ambil top 6 entity
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 6);
+  }
+
   window.executeQuery = async () => {
     const q = $('cmd-input').value.trim();
     if (!q || isBusy) return;
@@ -257,13 +286,12 @@
     $('empty-canvas').style.display = 'none';
     $('report-container').classList.remove('hidden');
     
-    // Reset UI state
     $('r-id').textContent = 'LOAD...';
-    $('r-words').textContent = '0';
+    $('r-time').textContent = 'WAIT';
     $('r-query').textContent = q;
-    $('r-time').textContent = '--:--';
     $('r-answer').innerHTML = '<div class="mono text-[var(--accent)] animate-pulse py-4">> INITIATING RAG PIPELINE...</div>';
-    $('evidence-table-body').innerHTML = '';
+    $('r-entities').innerHTML = '<span class="mono text-[10px] text-[var(--text-muted)]">Scanning...</span>';
+    $('evidence-list').innerHTML = '';
     
     try {
       const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
@@ -274,50 +302,53 @@
       const answerText = data.answer || 'Tiada jawapan.';
       const id = Math.random().toString(36).substring(2, 7).toUpperCase();
       const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      const wordCount = answerText.split(/\s+/).length;
 
-      // Populate metrics
       $('r-id').textContent = id;
-      $('r-words').textContent = wordCount;
       $('r-time').textContent = time;
       
       // Render Markdown
       const rawHTML = marked.parse(answerText);
       $('r-answer').innerHTML = DOMPurify.sanitize(rawHTML);
 
-      // Render Table
+      // Extract Entities & Render
+      const entities = extractEntities(answerText);
+      $('r-entities').innerHTML = entities.length > 0 
+        ? entities.map(e => `<span class="entity-tag">${e}</span>`).join('') 
+        : '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
+
+      // Render Evidence in Right Column (as stacked buttons)
       const sources = data.sources || [];
       $('t-src').textContent = `SRC: ${sources.length}`;
       
       if (sources.length === 0) {
-        $('evidence-table-body').innerHTML = '<tr><td colspan="4" class="p-3 mono text-[10px] text-center text-[var(--text-muted)]">NO EVIDENCE EXTRACTED</td></tr>';
+        $('evidence-list').innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO EVIDENCE</div>';
       } else {
         sources.forEach((src, i) => {
           const match = src.match(/^(.*?)\s*\((\d*\.?\d+)\)\s*$/);
           const name = match ? match[1] : src;
           const score = match ? match[2] : '---';
 
-          const tr = document.createElement('tr');
-          tr.className = 'border-b border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors';
-          tr.innerHTML = `
-            <td class="py-2 px-3 mono text-[10px] text-[var(--text-muted)]">${(i+1).toString().padStart(2,'0')}</td>
-            <td class="py-2 px-3 mono text-[11px] text-[var(--text-main)]">${name}</td>
-            <td class="py-2 px-3 mono text-[10px] text-[var(--accent)] text-right">${score}</td>
-            <td class="py-2 px-3 text-center">
-               <button class="mono text-[9px] border border-[var(--border)] px-1.5 py-0.5 hover:bg-[var(--accent)] hover:text-black transition-colors">VIEW</button>
-            </td>
+          const btn = document.createElement('button');
+          btn.className = 'w-full text-left border border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--accent)] transition-colors p-2 rounded-sm flex flex-col gap-1 group';
+          btn.innerHTML = `
+            <div class="flex justify-between items-center w-full">
+               <span class="mono text-[10px] text-[var(--text-muted)] group-hover:text-[var(--text-main)]">00${i+1}</span>
+               <span class="mono text-[9px] text-[var(--accent)] bg-[#09090b] border border-[var(--border)] px-1">CONF: ${score}</span>
+            </div>
+            <div class="mono text-[11px] text-[var(--text-main)] truncate w-full">> ${name}</div>
           `;
-          $('evidence-table-body').appendChild(tr);
+          $('evidence-list').appendChild(btn);
         });
       }
       
-      history.unshift({ id, time, q, answer: answerText, sources, wordCount });
+      history.unshift({ id, time, q, answer: answerText, sources, entities });
       renderHistory();
 
     } catch (e) {
       $('r-id').textContent = 'ERR';
       $('r-answer').innerHTML = `<div class="mono text-red-400 border border-red-900 bg-red-950/20 p-3 rounded-sm">SYSTEM ERROR: ${e.message}</div>`;
-      $('evidence-table-body').innerHTML = '';
+      $('evidence-list').innerHTML = '';
+      $('r-entities').innerHTML = '';
     } finally {
       isBusy = false;
       $('cmd-input').value = '';
@@ -352,28 +383,34 @@
     $('report-container').classList.remove('hidden');
     
     $('r-id').textContent = item.id;
-    $('r-words').textContent = item.wordCount || 0;
     $('r-time').textContent = item.time;
     $('r-query').textContent = item.q;
     
     const rawHTML = marked.parse(item.answer || 'Tiada jawapan.');
     $('r-answer').innerHTML = DOMPurify.sanitize(rawHTML);
     
-    $('evidence-table-body').innerHTML = '';
+    const entities = item.entities || [];
+    $('r-entities').innerHTML = entities.length > 0 
+        ? entities.map(e => `<span class="entity-tag">${e}</span>`).join('') 
+        : '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
+
+    $('evidence-list').innerHTML = '';
     const sources = item.sources || [];
     sources.forEach((src, i) => {
         const match = src.match(/^(.*?)\s*\((\d*\.?\d+)\)\s*$/);
         const name = match ? match[1] : src;
         const score = match ? match[2] : '---';
-        const tr = document.createElement('tr');
-        tr.className = 'border-b border-[var(--border)] hover:bg-[var(--bg-hover)]';
-        tr.innerHTML = `
-          <td class="py-2 px-3 mono text-[10px] text-[var(--text-muted)]">${(i+1).toString().padStart(2,'0')}</td>
-          <td class="py-2 px-3 mono text-[11px] text-[var(--text-main)]">${name}</td>
-          <td class="py-2 px-3 mono text-[10px] text-[var(--accent)] text-right">${score}</td>
-          <td class="py-2 px-3 text-center"><button class="mono text-[9px] border border-[var(--border)] px-1.5 py-0.5">VIEW</button></td>
+
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left border border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--accent)] transition-colors p-2 rounded-sm flex flex-col gap-1 group';
+        btn.innerHTML = `
+          <div class="flex justify-between items-center w-full">
+             <span class="mono text-[10px] text-[var(--text-muted)] group-hover:text-[var(--text-main)]">00${i+1}</span>
+             <span class="mono text-[9px] text-[var(--accent)] bg-[#09090b] border border-[var(--border)] px-1">CONF: ${score}</span>
+          </div>
+          <div class="mono text-[11px] text-[var(--text-main)] truncate w-full">> ${name}</div>
         `;
-        $('evidence-table-body').appendChild(tr);
+        $('evidence-list').appendChild(btn);
     });
   }
 
