@@ -171,13 +171,13 @@
             <div class="text-[var(--accent)] mb-1 font-bold">[ 3D SPATIAL ENGINE ]</div>
             <div>ZONE: LEMBAH KLANG</div>
             <div id="hud-coords">LAT: 3.07 N, LON: 101.51 E</div>
-            <div class="mt-2 text-red-500 animate-pulse">● LIVE OSM DATA LINKED</div>
+            <div class="mt-2 text-red-500 animate-pulse">● GO SERVER LINKED</div>
           </div>
           
           <div class="map-hud bottom-4 right-4 text-right pr-12 pb-2">
             <div>ENGINE: MAPLIBRE GL (WEBGL)</div>
-            <div>DATA: OVERPASS API (OSM)</div>
-            <div id="hud-buildings" class="text-white mt-1 text-yellow-400">INITIALIZING GPU...</div>
+            <div>DATA: GOLANG + OVERPASS API</div>
+            <div id="hud-buildings" class="text-white mt-1 text-yellow-400">INITIALIZING GO...</div>
           </div>
         </div>
 
@@ -299,29 +299,28 @@
     });
   }
 
-  // --- OVERPASS API DATA INJECTION (WITH MOCK FALLBACK) ---
+  // --- LIVE DATA VIA GO SERVER ---
   async function fetchLiveBuildings() {
-    $('hud-buildings').textContent = "SCANNING VIEWPORT...";
+    $('hud-buildings').textContent = "GO SERVER: SCANNING...";
     
-    const bounds = map.getBounds();
-    const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
-    
-    const query = `
-      [out:json][timeout:15];
-      way["building"="construction"](${bbox});
-      out geom 100;
-    `;
+    const center = map.getCenter();
+    const lat = center.lat;
+    const lng = center.lng;
     
     try {
-      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-      if (!res.ok) throw new Error("API Error");
-      const data = await res.json();
+      // Tembak ke Go Server
+      const res = await fetch(`http://127.0.0.1:8081/ws?lat=${lat}&lng=${lng}`);
+      if (!res.ok) throw new Error("Go Server Error");
       
-      const features = data.elements.map(el => {
+      const payload = await res.json();
+      
+      if (payload.type === 'error') throw new Error(payload.data);
+      
+      const features = payload.data.map(el => {
         if (!el.geometry) return null;
         return {
           type: 'Feature',
-          properties: { id: el.id, type: 'construction' },
+          properties: { id: el.id },
           geometry: {
             type: 'Polygon',
             coordinates: [el.geometry.map(pt => [pt.lon, pt.lat])]
@@ -331,10 +330,10 @@
 
       const geojson = { type: 'FeatureCollection', features: features };
       renderBuildingsOnMap(geojson, features.length);
-
+      
     } catch (e) {
-      console.error("Overpass API Failed. Using Mock Data.", e);
-      loadMockData();
+      console.error("Go Server error, using fallback:", e);
+      loadMockData(); // Guna mock data kalau Go server mati
     }
   }
 
@@ -359,9 +358,8 @@
   }
 
   function loadMockData() {
-    $('hud-buildings').innerHTML = `<span class="text-yellow-500">SIMULATED DATA (API DOWN)</span>`;
+    $('hud-buildings').innerHTML = `<span class="text-yellow-500">SIMULATED DATA (GO SERVER OFFLINE)</span>`;
     
-    // Bangunan 3D palsu di sekitar KLCC
     const mockFeatures = [
       { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.686, 3.138], [101.687, 3.138], [101.687, 3.139], [101.686, 3.139]]] } },
       { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[101.688, 3.137], [101.689, 3.137], [101.689, 3.138], [101.688, 3.138]]] } },
@@ -514,8 +512,6 @@
       view.className = 'view-section absolute inset-0 hidden bg-[var(--bg-app)] z-50';
       const answer = data.answer || 'Tiada jawapan.';
       
-      // Note: marked.js dan dompurify mungkin tak include dalam snippet ni sebab kita fokus UI
-      // Kalau kau nak render markdown, pastikan library tu ada kat head. Kalau tak, guna .innerText
       view.innerHTML = `
         <div class="h-full flex flex-col">
           <div class="bg-[var(--bg-header)] border-b border-[var(--border)] p-3 flex justify-between items-center shrink-0">
