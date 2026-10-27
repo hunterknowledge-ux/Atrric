@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import sqlite3
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -9,46 +8,35 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-# Cuba import fungsi kau (Pastikan nama fungsi betul)
-try:
-    from core.rag import answer_question
-except ImportError:
-    def answer_question(q): return {"error": "core.rag not found", "answer": "", "sources": []}
+from core.rag import answer_question
+
+PORT = 8000
 
 def get_dashboard_data():
-    # 1. Baca summary.json (dari analytics/write.py)
+    # Baca summary.json (Data Analitik Gen Z)
     summary_path = os.path.join(_ROOT, "analytics_out", "summary.json")
     summary = {}
     if os.path.exists(summary_path):
         with open(summary_path, "r", encoding="utf-8") as f:
             summary = json.load(f)
 
-    # 2. Baca SQLite News & Spatial (dari report/generate.py)
-    spatial_data = []
-    news_data = []
-    
-    try:
-        db_spatial = os.path.join(_ROOT, "raw_data/spatial/atrric_macro.db")
-        conn = sqlite3.connect(db_spatial)
-        cur = conn.cursor()
-        cur.execute("SELECT district, SUM(CAST(population AS REAL)) as total FROM population_data WHERE state = 'Selangor' AND (age = '15-19' OR age = '20-24') AND sex = 'both' AND ethnicity = 'overall' GROUP BY district ORDER BY total DESC LIMIT 5")
-        spatial_data = [{"district": r[0], "population": r[1]} for r in cur.fetchall()]
-        conn.close()
-    except Exception as e:
-        pass
+    # Data Spatial Mock (Untuk demo sidebar)
+    spatial = [
+        {"district": "Petaling", "population": 2500000},
+        {"district": "Ulu Langat", "population": 1600000},
+        {"district": "Klang", "population": 1200000},
+        {"district": "Gombak", "population": 1000000},
+        {"district": "Sepang", "population": 400000},
+    ]
 
-    try:
-        db_news = os.path.join(_ROOT, "raw_data/news/atrric_news.db")
-        conn = sqlite3.connect(db_news)
-        cur = conn.cursor()
-        cur.execute("SELECT title FROM news ORDER BY id DESC LIMIT 5")
-        news_data = [{"title": r[0]} for r in cur.fetchall()]
-        conn.close()
-    except Exception as e:
-        pass
+    # Data News Mock
+    news = [
+        {"title": "Rapid KL to deploy 85 shuttle buses at Sepang"},
+        {"title": "Data Centre Bill to go to Cabinet"},
+        {"title": "Sarawak targets 15,000MW power capacity"}
+    ]
 
-    return {"summary": summary, "spatial": spatial_data, "news": news_data}
-
+    return {"summary": summary, "spatial": spatial, "news": news}
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -64,12 +52,8 @@ class Handler(SimpleHTTPRequestHandler):
                 except Exception as e:
                     data = {"error": str(e), "answer": "", "sources": []}
             self._send_json(data)
-
         elif parsed.path == "/api/dashboard":
-            # Hantar data penuh dashboard
-            data = get_dashboard_data()
-            self._send_json(data)
-
+            self._send_json(get_dashboard_data())
         else:
             super().do_GET()
 
@@ -86,5 +70,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    print(f"[Atrric] http://localhost:8000")
-    HTTPServer(("127.0.0.1", 8000), Handler).serve_forever()
+    print(f"[Atrric] Python API running on :{PORT}")
+    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
