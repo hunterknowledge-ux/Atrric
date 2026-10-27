@@ -10,6 +10,11 @@
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+
+<!-- LEAFLET CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
   :root {
     --bg-app: #05070A;
@@ -31,11 +36,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Blueprint Grid */
-    background-image: 
-      linear-gradient(rgba(31, 46, 61, 0.3) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(31, 46, 61, 0.3) 1px, transparent 1px);
-    background-size: 20px 20px;
   }
 
   .mono { font-family: var(--font-mono); }
@@ -45,108 +45,81 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-light); }
 
-  /* APP LAYOUT */
-  .app-layout {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-  }
+  .app-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
 
-  /* SIDEBARS (Mobile: Fixed Drawers, Desktop: Static) */
   .sidebar {
-    background: var(--bg-panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    width: 280px;
-    z-index: 40;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; width: 280px;
+    z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-
-  .sidebar-right {
-    border-right: none;
-    border-left: 1px solid var(--border);
-  }
+  .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
 
   @media (max-width: 768px) {
-    .sidebar {
-      position: fixed;
-      top: 0; bottom: 0;
-      transform: translateX(-100%);
-    }
-    .sidebar-right {
-      right: 0;
-      transform: translateX(100%);
-    }
+    .sidebar { position: fixed; top: 0; bottom: 0; transform: translateX(-100%); }
+    .sidebar-right { right: 0; transform: translateX(100%); }
     .sidebar.open { transform: translateX(0) !important; }
   }
 
-  /* MAIN CANVAS */
-  .main-canvas {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    background: rgba(5, 7, 10, 0.8);
-  }
+  .main-canvas { flex: 1; display: flex; flex-direction: column; min-width: 0; background: rgba(5, 7, 10, 0.8); }
 
-  /* TABS */
-  .tab-bar {
-    display: flex;
-    background: var(--bg-header);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-  }
+  .tab-bar { display: flex; background: var(--bg-header); border-bottom: 1px solid var(--border); overflow-x: auto; z-index: 1000;}
   .tab-btn {
-    padding: 8px 16px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    border-right: 1px solid var(--border);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    padding: 8px 16px; font-family: var(--font-mono); font-size: 11px;
+    text-transform: uppercase; color: var(--text-muted); border-right: 1px solid var(--border);
+    cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
   }
   .tab-btn:hover { color: var(--text-main); background: var(--bg-panel); }
   .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--bg-panel); }
-  .tab-btn .close-tab { opacity: 0.5; font-size: 14px; }
-  .tab-btn .close-tab:hover { opacity: 1; color: red; }
 
-  /* LIST ITEMS */
   .nav-item {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    display: flex;
-    justify-content: space-between;
-    transition: all 0.2s;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; display: flex; justify-content: space-between; transition: all 0.2s;
   }
   .nav-item:hover { background: var(--bg-header); color: var(--accent); }
-  .nav-item.active { background: var(--bg-header); border-left: 2px solid var(--accent); }
 
-  /* MARKDOWN */
   .md-content { font-size: 13.5px; line-height: 1.6; color: #CBD5E1; padding: 20px; }
   .md-content p { margin-bottom: 12px; }
   .md-content strong { color: #F8FAFC; font-weight: 600; }
-  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 12px; }
-  .md-content li { margin-bottom: 4px; }
-  .md-content h1, .md-content h2, .md-content h3 { color: #F8FAFC; font-weight: 600; margin: 16px 0 8px 0; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 
-  /* OVERLAY */
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 30; display: none; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 999; display: none; }
   #overlay.show { display: block; }
 
-  /* INPUT */
   .cmd-box { border: 1px solid var(--border-light); background: var(--bg-app); display: flex; align-items: center; padding: 4px 8px; }
   .cmd-box:focus-within { border-color: var(--accent); }
   .cmd-input { background: transparent; border: none; outline: none; color: var(--text-main); width: 100%; font-family: var(--font-mono); font-size: 12px; }
+
+  /* --- LEAFLET TACTICAL STYLES --- */
+  #map { width: 100%; height: 100%; background: #05070A; z-index: 1; }
+  
+  /* Hologram Grid Overlay (Pointer-events none so we can still drag the map) */
+  .map-overlay {
+    position: absolute; inset: 0; pointer-events: none; z-index: 400;
+    background-image: 
+      linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+  }
+  
+  /* Scanlines */
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 401;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+    background-size: 100% 4px;
+    opacity: 0.3;
+  }
+
+  /* HUD Text */
+  .map-hud {
+    position: absolute; z-index: 500; pointer-events: none;
+    font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+    text-shadow: 0 0 5px rgba(34,211,238,0.5);
+  }
+
+  /* Leaflet Override for Dark Theme */
+  .leaflet-container { background: #05070A !important; font-family: 'Inter', sans-serif !important; }
+  .leaflet-popup-content-wrapper { background: #0F141C !important; color: #E2E8F0 !important; border: 1px solid #1F2E3D !important; border-radius: 2px !important; }
+  .leaflet-popup-tip { background: #0F141C !important; }
 </style>
 </head>
 <body>
@@ -154,7 +127,7 @@
   <div id="overlay" onclick="closeDrawers()"></div>
 
   <!-- HEADER -->
-  <header class="h-10 shrink-0 flex items-center justify-between px-3 bg-[var(--bg-header)] border-b border-[var(--border)] z-50">
+  <header class="h-10 shrink-0 flex items-center justify-between px-3 bg-[var(--bg-header)] border-b border-[var(--border)] z-[1001]">
     <div class="flex items-center gap-2">
       <button class="md:hidden text-[var(--text-muted)] hover:text-[var(--accent)]" onclick="toggleDrawer('left')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -170,18 +143,14 @@
     </div>
   </header>
 
-  <!-- APP LAYOUT -->
   <div class="app-layout">
 
-    <!-- LEFT SIDEBAR (NAVIGATION) -->
+    <!-- LEFT SIDEBAR -->
     <aside id="sidebar-left" class="sidebar">
-      <div class="h-8 border-b border-[var(--border)] flex items-center px-3 mono text-[10px] text-[var(--text-muted)] bg-[var(--bg-header)]">
-        EXPLORER
-      </div>
+      <div class="h-8 border-b border-[var(--border)] flex items-center px-3 mono text-[10px] text-[var(--text-muted)] bg-[var(--bg-header)]">EXPLORER</div>
       <div class="flex-1 overflow-y-auto">
         <div class="px-3 py-2 mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider bg-[#090D13] border-b border-[var(--border)]">Spatial Data</div>
         <div id="nav-spatial"></div>
-        
         <div class="px-3 py-2 mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider bg-[#090D13] border-b border-[var(--border)] mt-2">Trigger Events</div>
         <div id="nav-news"></div>
       </div>
@@ -189,21 +158,42 @@
 
     <!-- MAIN CANVAS -->
     <main class="main-canvas">
-      <!-- TABS -->
       <div class="tab-bar" id="tab-bar">
-        <div class="tab-btn active" onclick="switchTab('overview')">
-          [ OVERVIEW ]
-        </div>
-        <!-- Dynamic tabs injected here -->
+        <div class="tab-btn active" data-target="map" onclick="switchTab('map')">[ TACTICAL MAP ]</div>
+        <div class="tab-btn" data-target="overview" onclick="switchTab('overview')">[ ANALYTICS ]</div>
       </div>
 
-      <!-- CANVAS CONTENT -->
-      <div class="flex-1 overflow-auto relative" id="canvas-content">
+      <div class="flex-1 overflow-hidden relative" id="canvas-content">
         
-        <!-- VIEW: OVERVIEW -->
-        <div id="view-overview" class="view-section absolute inset-0 p-4">
+        <!-- TACTICAL MAP VIEW -->
+        <div id="view-map" class="view-section absolute inset-0">
+          
+          <!-- LEAFLET MAP CONTAINER -->
+          <div id="map"></div>
+          
+          <!-- HOLOGRAM OVERLAYS -->
+          <div class="map-overlay"></div>
+          <div class="scanlines"></div>
+          
+          <!-- HUD INFO -->
+          <div class="map-hud top-4 left-4">
+            <div class="text-[var(--accent)] mb-1 font-bold">[ GEOSPATIAL RADAR ]</div>
+            <div>ZONE: SELANGOR</div>
+            <div id="hud-coords">LAT: 3.07 N, LON: 101.51 E</div>
+            <div class="mt-2 text-red-500 animate-pulse">● LIVE OSM DATA LINKED</div>
+          </div>
+          
+          <div class="map-hud bottom-4 right-4 text-right">
+            <div>ENGINE: LEAFLET.JS</div>
+            <div>DATA: OVERPASS API (OSM)</div>
+            <div id="hud-buildings" class="text-white mt-1">SCANNING BUILDINGS...</div>
+          </div>
+
+        </div>
+
+        <!-- ANALYTICS VIEW -->
+        <div id="view-overview" class="view-section absolute inset-0 p-4 hidden">
           <div class="max-w-4xl mx-auto flex flex-col gap-4">
-            
             <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
                <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">Systemic Analytics</div>
                <div class="grid grid-cols-3 gap-2 mb-6">
@@ -220,21 +210,19 @@
                     <div class="mono text-xl text-red-500" id="sent-neg">-</div>
                   </div>
                </div>
-               
                <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Top Topics (Volume)</div>
                <div id="topic-chart" class="flex flex-col gap-1"></div>
             </div>
-
           </div>
         </div>
 
-        <!-- DYNAMIC VIEWS (News Detail, Spatial Detail, RAG Query) will appear here -->
+        <!-- DYNAMIC VIEWS -->
         <div id="dynamic-views"></div>
 
       </div>
     </main>
 
-    <!-- RIGHT SIDEBAR (AIP ASSIST) -->
+    <!-- RIGHT SIDEBAR -->
     <aside id="sidebar-right" class="sidebar sidebar-right">
       <div class="h-8 border-b border-[var(--border)] flex items-center justify-between px-3 mono text-[10px] bg-[var(--bg-header)]">
         <span class="text-[var(--accent)] font-bold">AIP ASSIST</span>
@@ -260,7 +248,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   let isBusy = false;
-  let tabCount = 0;
+  let map;
 
   // Clock
   setInterval(() => { $('clock').textContent = new Date().toTimeString().split(' ')[0]; }, 1000);
@@ -270,10 +258,7 @@
     const el = side === 'left' ? $('sidebar-left') : $('sidebar-right');
     const isOpen = el.classList.contains('open');
     closeDrawers();
-    if (!isOpen) {
-      el.classList.add('open');
-      $('overlay').classList.add('show');
-    }
+    if (!isOpen) { el.classList.add('open'); $('overlay').classList.add('show'); }
   };
   window.closeDrawers = () => {
     $('sidebar-left').classList.remove('open');
@@ -285,32 +270,29 @@
   window.switchTab = (id) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
-    
-    // Activate target
     const btn = document.querySelector(`.tab-btn[data-target="${id}"]`);
     if(btn) btn.classList.add('active');
-    
     const view = $(`view-${id}`);
     if(view) view.classList.remove('hidden');
+    
+    // Refresh map size if switching to map (fix grey tile bug)
+    if(id === 'map' && map) { setTimeout(() => map.invalidateSize(), 100); }
   };
 
-  // Create dynamic tab
   function createTab(id, title) {
     const bar = $('tab-bar');
     const btn = document.createElement('div');
     btn.className = 'tab-btn';
     btn.dataset.target = id;
-    btn.innerHTML = `${title} <span class="close-tab" onclick="event.stopPropagation(); this.parentElement.remove(); document.getElementById('view-${id}').remove(); switchTab('overview');">×</span>`;
+    btn.innerHTML = `${title} <span class="close-tab" onclick="event.stopPropagation(); this.parentElement.remove(); document.getElementById('view-${id}').remove(); switchTab('map');">×</span>`;
     btn.onclick = () => switchTab(id);
     bar.appendChild(btn);
     return btn;
   }
 
-  // Chart Renderer
   function renderChart(containerId, data, labelKey, valueKey) {
     const el = $(containerId);
     if (!data || data.length === 0) return el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
-    
     const maxVal = Math.max(...data.map(d => d[valueKey]));
     el.innerHTML = data.slice(0, 8).map(d => {
       const pct = (d[valueKey] / maxVal) * 100;
@@ -324,7 +306,100 @@
     }).join('');
   }
 
-  // Fetch Dashboard Data
+  // --- INITIALIZE LEAFLET MAP ---
+  function initMap() {
+    // Center map on Selangor (Shah Alam / KL area)
+    map = L.map('map', {
+      zoomControl: false, // Hide default zoom, we'll add our own or use pinch
+      attributionControl: false
+    }).setView([3.0738, 101.5183], 10);
+
+    // Add Dark Matter Tile Layer (CartoDB) - Free, No API Key
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    // Track Mouse Movement for HUD
+    map.on('mousemove', function(e) {
+      $('hud-coords').textContent = `LAT: ${e.latlng.lat.toFixed(4)} N, LON: ${e.latlng.lng.toFixed(4)} E`;
+    });
+
+    // Add Zoom Control at Bottom Right
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Fetch Live Buildings from Overpass API
+    fetchLiveBuildings();
+  }
+
+  // --- OVERPASS API (LIVE OSM DATA) ---
+  async function fetchLiveBuildings() {
+    $('hud-buildings').textContent = "SCANNING AREA...";
+    
+    // Bounding box for Selangor area (approx) - to avoid overloading API
+    // Format: [south, west, north, east]
+    const bbox = "2.9,101.3,3.3,101.8"; 
+    
+    // Query: Get buildings that are under construction
+    const query = `
+      [out:json][timeout:25];
+      (
+        way["building"="construction"](${bbox});
+        way["building"="yes"](${bbox});
+      );
+      out geom;
+    `;
+    
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: query
+      });
+      const data = await res.json();
+      
+      let countCon = 0;
+      let countDone = 0;
+
+      // Loop through each building found
+      data.elements.forEach(el => {
+        if (!el.geometry) return;
+        
+        // Convert OSM geometry to Leaflet LatLngs
+        const latlngs = el.geometry.map(pt => [pt.lat, pt.lon]);
+        const isConstruction = el.tags && el.tags.building === 'construction';
+        
+        // Style: Red for construction, Cyan for completed
+        const color = isConstruction ? '#ef4444' : '#22d3ee';
+        const fillColor = isConstruction ? '#7f1d1d' : '#164e63';
+        
+        if (isConstruction) countCon++;
+        else countDone++;
+
+        // Draw polygon on map
+        L.polygon(latlngs, {
+          color: color,
+          weight: 1,
+          fillColor: fillColor,
+          fillOpacity: 0.5
+        }).addTo(map).bindPopup(`
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+            <strong style="color: ${color};">${isConstruction ? '⚠ CONSTRUCTION SITE' : '✓ COMPLETED BUILDING'}</strong><br>
+            OSM ID: ${el.id}<br>
+            ${el.tags.name ? 'Name: ' + el.tags.name + '<br>' : ''}
+            ${el.tags['addr:street'] ? 'Street: ' + el.tags['addr:street'] : ''}
+          </div>
+        `);
+      });
+
+      $('hud-buildings').innerHTML = `FOUND: <span class="text-red-500">${countCon} CONSTRUCTION</span> / <span class="text-[var(--accent)]">${countDone} DONE</span>`;
+
+    } catch (e) {
+      console.error(e);
+      $('hud-buildings').textContent = "API LIMIT OR ERROR. TRY AGAIN LATER.";
+    }
+  }
+
+  // --- DASHBOARD DATA ---
   async function loadDashboard() {
     try {
       const res = await fetch('/api/dashboard');
@@ -340,7 +415,7 @@
       const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] }));
       renderChart('topic-chart', topicsArr, 'name', 'count');
 
-      // Left Nav Spatial
+      // Sidebar Data
       const navSp = $('nav-spatial');
       if (data.spatial && data.spatial.length) {
         navSp.innerHTML = data.spatial.map(s => `
@@ -351,7 +426,6 @@
         `).join('');
       }
 
-      // Left Nav News
       const navNews = $('nav-news');
       if (data.news && data.news.length) {
         navNews.innerHTML = data.news.map((n, i) => `
@@ -361,33 +435,21 @@
           </div>
         `).join('');
       }
-
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }
 
-  // Handle Left Nav Clicks (Open Detail Views)
   window.openSpatial = (district, pop) => {
     closeDrawers();
     const id = 'spatial-' + district.replace(/\s+/g, '-').toLowerCase();
-    
-    // Check if tab exists
     if (!$(id)) {
       const container = $('dynamic-views');
       const view = document.createElement('div');
       view.id = 'view-' + id;
-      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto';
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto bg-[var(--bg-app)] z-50';
       view.innerHTML = `
         <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-2xl mx-auto">
           <div class="mono text-[10px] text-[var(--accent)] mb-2">[ SPATIAL TARGET: ${district.toUpperCase()} ]</div>
           <div class="text-2xl font-mono mb-4">${pop.toLocaleString()} <span class="text-xs text-[var(--text-muted)]">Gen Z</span></div>
-          <div class="h-48 border border-[var(--border)] bg-[#090D13] flex items-center justify-center relative overflow-hidden">
-            <!-- Fake Map Grid -->
-            <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(var(--accent) 1px, transparent 0); background-size: 10px 10px;"></div>
-            <div class="w-4 h-4 bg-[var(--accent)] rounded-full animate-ping absolute"></div>
-            <div class="w-2 h-2 bg-white rounded-full relative z-10"></div>
-          </div>
           <div class="mono text-[10px] text-[var(--text-muted)] mt-4">Data Source: atrric_macro.db</div>
         </div>
       `;
@@ -404,7 +466,7 @@
       const container = $('dynamic-views');
       const view = document.createElement('div');
       view.id = 'view-' + id;
-      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto';
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto bg-[var(--bg-app)] z-50';
       view.innerHTML = `
         <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-3xl mx-auto">
           <div class="mono text-[10px] text-red-400 mb-2">[ TRIGGER EVENT DETECTED ]</div>
@@ -418,37 +480,28 @@
     switchTab(id);
   };
 
-  // Handle RAG Query
   window.executeQuery = async () => {
     const q = $('cmd-input').value.trim();
     if (!q || isBusy) return;
-    
-    isBusy = true;
-    $('cmd-input').value = '';
-    
-    // Add to chat history
+    isBusy = true; $('cmd-input').value = '';
     const chat = $('chat-history');
     chat.innerHTML += `<div class="text-[var(--accent)] mt-2">> ${q}</div>`;
     chat.innerHTML += `<div id="chat-loading" class="text-[var(--text-muted)] animate-pulse">Compiling intelligence...</div>`;
     chat.scrollTop = chat.scrollHeight;
-    
     closeDrawers();
 
     try {
       const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      
       $('chat-loading').remove();
       chat.innerHTML += `<div class="text-[var(--text-main)] border-l border-[var(--border)] pl-2">Report compiled.</div>`;
       chat.scrollTop = chat.scrollHeight;
 
-      // Create new Report Tab in Main Canvas
       const id = 'report-' + Date.now();
       const container = $('dynamic-views');
       const view = document.createElement('div');
       view.id = 'view-' + id;
-      view.className = 'view-section absolute inset-0 hidden';
-      
+      view.className = 'view-section absolute inset-0 hidden bg-[var(--bg-app)] z-50';
       const answer = data.answer || 'Tiada jawapan.';
       const rawHTML = marked.parse(answer);
       
@@ -459,27 +512,22 @@
              <button onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.textContent='[ COPIED ]'; setTimeout(()=>this.textContent='[ COPY ]', 1500)" class="mono text-[10px] text-[var(--text-muted)] hover:text-white">[ COPY ]</button>
              <div class="hidden">${answer}</div>
           </div>
-          <div class="flex-1 overflow-y-auto md-content">
-            ${DOMPurify.sanitize(rawHTML)}
-          </div>
+          <div class="flex-1 overflow-y-auto md-content">${DOMPurify.sanitize(rawHTML)}</div>
         </div>
       `;
-      
       container.appendChild(view);
       createTab(id, `RPT: ${q.substring(0,10)}...`);
       switchTab(id);
-
     } catch (e) {
       $('chat-loading').remove();
       chat.innerHTML += `<div class="text-red-500 mt-2">ERROR: ${e.message}</div>`;
-      chat.scrollTop = chat.scrollHeight;
-    } finally {
-      isBusy = false;
-    }
+    } finally { isBusy = false; }
   };
 
   $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') executeQuery(); });
 
+  // Boot
+  initMap();
   loadDashboard();
 
 })();
