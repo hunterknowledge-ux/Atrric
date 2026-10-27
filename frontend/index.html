@@ -8,15 +8,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
   :root {
-    --bg-app: #09090b;
-    --bg-panel: #121215;
-    --bg-hover: #1c1c21;
-    --border: #27272a;
-    --border-light: #3f3f46;
-    --text-main: #e4e4e7;
-    --text-muted: #71717a;
+    --bg-app: #05070A;
+    --bg-panel: #0F141C;
+    --bg-header: #090D13;
+    --border: #1F2E3D;
+    --border-light: #334155;
+    --text-main: #E2E8F0;
+    --text-muted: #64748B;
     --accent: #22d3ee;
     --font-mono: 'JetBrains Mono', monospace;
   }
@@ -29,6 +31,11 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Blueprint Grid */
+    background-image: 
+      linear-gradient(rgba(31, 46, 61, 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(31, 46, 61, 0.3) 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 
   .mono { font-family: var(--font-mono); }
@@ -38,231 +45,440 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-light); }
 
-  /* GRID LAYOUT (Mobile First, Desktop Multi-Pane) */
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    height: 100%;
-  }
-  @media (min-width: 1024px) {
-    .dashboard-grid {
-      grid-template-columns: 300px 1fr 300px;
-      height: calc(100dvh - 80px); /* adjust for header/footer */
-    }
+  /* APP LAYOUT */
+  .app-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
   }
 
-  .panel-cell {
+  /* SIDEBARS (Mobile: Fixed Drawers, Desktop: Static) */
+  .sidebar {
     background: var(--bg-panel);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    width: 280px;
+    z-index: 40;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .panel-header {
-    background: #09090b;
+  .sidebar-right {
+    border-right: none;
+    border-left: 1px solid var(--border);
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      top: 0; bottom: 0;
+      transform: translateX(-100%);
+    }
+    .sidebar-right {
+      right: 0;
+      transform: translateX(100%);
+    }
+    .sidebar.open { transform: translateX(0) !important; }
+  }
+
+  /* MAIN CANVAS */
+  .main-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: rgba(5, 7, 10, 0.8);
+  }
+
+  /* TABS */
+  .tab-bar {
+    display: flex;
+    background: var(--bg-header);
     border-bottom: 1px solid var(--border);
-    padding: 8px 12px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 8px 16px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-muted);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab-btn:hover { color: var(--text-main); background: var(--bg-panel); }
+  .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--bg-panel); }
+  .tab-btn .close-tab { opacity: 0.5; font-size: 14px; }
+  .tab-btn .close-tab:hover { opacity: 1; color: red; }
+
+  /* LIST ITEMS */
+  .nav-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 11px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    transition: all 0.2s;
   }
+  .nav-item:hover { background: var(--bg-header); color: var(--accent); }
+  .nav-item.active { background: var(--bg-header); border-left: 2px solid var(--accent); }
 
-  .panel-content {
-    padding: 12px;
-    overflow-y: auto;
-    flex: 1;
-  }
+  /* MARKDOWN */
+  .md-content { font-size: 13.5px; line-height: 1.6; color: #CBD5E1; padding: 20px; }
+  .md-content p { margin-bottom: 12px; }
+  .md-content strong { color: #F8FAFC; font-weight: 600; }
+  .md-content ul { list-style: square; padding-left: 16px; margin-bottom: 12px; }
+  .md-content li { margin-bottom: 4px; }
+  .md-content h1, .md-content h2, .md-content h3 { color: #F8FAFC; font-weight: 600; margin: 16px 0 8px 0; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 
-  /* DATA VISUALIZATION */
-  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; }
-  .bar-label { width: 100px; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-  .bar-track { flex: 1; height: 6px; background: var(--border); }
-  .bar-fill { height: 100%; background: var(--accent); }
-  .bar-val { width: 30px; text-align: right; color: var(--text-main); }
+  /* OVERLAY */
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 30; display: none; }
+  #overlay.show { display: block; }
 
-  .stat-box { border: 1px solid var(--border); padding: 8px; margin-bottom: 8px; }
-  .stat-val { font-size: 20px; font-family: var(--font-mono); font-weight: bold; margin-top: 4px; }
+  /* INPUT */
+  .cmd-box { border: 1px solid var(--border-light); background: var(--bg-app); display: flex; align-items: center; padding: 4px 8px; }
+  .cmd-box:focus-within { border-color: var(--accent); }
+  .cmd-input { background: transparent; border: none; outline: none; color: var(--text-main); width: 100%; font-family: var(--font-mono); font-size: 12px; }
 </style>
 </head>
 <body>
 
-  <!-- TOP BAR -->
-  <header class="h-12 shrink-0 flex items-center justify-between px-4 bg-[var(--bg-panel)] border-b border-[var(--border)]">
-    <div class="flex items-center gap-3">
-      <div class="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></div>
-      <span class="mono text-sm font-bold tracking-widest">ATRRIC COMMAND CENTER</span>
+  <div id="overlay" onclick="closeDrawers()"></div>
+
+  <!-- HEADER -->
+  <header class="h-10 shrink-0 flex items-center justify-between px-3 bg-[var(--bg-header)] border-b border-[var(--border)] z-50">
+    <div class="flex items-center gap-2">
+      <button class="md:hidden text-[var(--text-muted)] hover:text-[var(--accent)]" onclick="toggleDrawer('left')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span class="mono text-xs font-bold tracking-widest">ATRRIC <span class="text-[var(--accent)]">WORKSPACE</span></span>
     </div>
-    <div class="flex items-center gap-4 mono text-[10px] text-[var(--text-muted)]">
-      <span>SYS: <span class="text-green-500">ONLINE</span></span>
-      <span id="clock">00:00:00</span>
+    <div class="flex items-center gap-4 mono text-[10px]">
+      <span class="hidden sm:inline">SYS: <span class="text-green-500">ONLINE</span></span>
+      <span id="clock" class="text-[var(--text-muted)]">00:00:00</span>
+      <button class="md:hidden text-[var(--text-muted)] hover:text-[var(--accent)]" onclick="toggleDrawer('right')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
     </div>
   </header>
 
-  <!-- MAIN DASHBOARD -->
-  <main class="flex-1 p-2 sm:p-4 overflow-y-auto bg-[var(--bg-app)]">
-    <div class="dashboard-grid">
-      
-      <!-- LEFT PANEL (Data Sources / Spatial) -->
-      <div class="panel-cell">
-        <div class="panel-header">
-          <span>Spatial Intelligence</span>
-          <span class="text-[var(--accent)]">ID: S-01</span>
+  <!-- APP LAYOUT -->
+  <div class="app-layout">
+
+    <!-- LEFT SIDEBAR (NAVIGATION) -->
+    <aside id="sidebar-left" class="sidebar">
+      <div class="h-8 border-b border-[var(--border)] flex items-center px-3 mono text-[10px] text-[var(--text-muted)] bg-[var(--bg-header)]">
+        EXPLORER
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        <div class="px-3 py-2 mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider bg-[#090D13] border-b border-[var(--border)]">Spatial Data</div>
+        <div id="nav-spatial"></div>
+        
+        <div class="px-3 py-2 mono text-[9px] text-[var(--text-muted)] uppercase tracking-wider bg-[#090D13] border-b border-[var(--border)] mt-2">Trigger Events</div>
+        <div id="nav-news"></div>
+      </div>
+    </aside>
+
+    <!-- MAIN CANVAS -->
+    <main class="main-canvas">
+      <!-- TABS -->
+      <div class="tab-bar" id="tab-bar">
+        <div class="tab-btn active" onclick="switchTab('overview')">
+          [ OVERVIEW ]
         </div>
-        <div class="panel-content" id="spatial-list">
-          <div class="mono text-[10px] text-[var(--text-muted)]">Loading spatial data...</div>
-        </div>
+        <!-- Dynamic tabs injected here -->
       </div>
 
-      <!-- CENTER PANEL (Analytics & Summary) -->
-      <div class="panel-cell border-x border-[var(--border)]">
-        <div class="panel-header">
-          <span>Systemic Analytics (RAG Output)</span>
-        </div>
-        <div class="panel-content flex flex-col gap-6">
-          
-          <!-- SENTIMENT -->
-          <div>
-            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">SENTIMENT ANALYSIS</div>
-            <div class="grid grid-cols-3 gap-2">
-              <div class="stat-box">
-                <div class="mono text-[9px] text-[var(--text-muted)]">POSITIVE</div>
-                <div class="stat-val text-green-500" id="sent-pos">0</div>
-              </div>
-              <div class="stat-box">
-                <div class="mono text-[9px] text-[var(--text-muted)]">NEUTRAL</div>
-                <div class="stat-val text-gray-400" id="sent-neu">0</div>
-              </div>
-              <div class="stat-box">
-                <div class="mono text-[9px] text-[var(--text-muted)]">NEGATIVE</div>
-                <div class="stat-val text-red-500" id="sent-neg">0</div>
-              </div>
+      <!-- CANVAS CONTENT -->
+      <div class="flex-1 overflow-auto relative" id="canvas-content">
+        
+        <!-- VIEW: OVERVIEW -->
+        <div id="view-overview" class="view-section absolute inset-0 p-4">
+          <div class="max-w-4xl mx-auto flex flex-col gap-4">
+            
+            <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
+               <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">Systemic Analytics</div>
+               <div class="grid grid-cols-3 gap-2 mb-6">
+                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                    <div class="mono text-[9px] text-[var(--text-muted)]">POSITIVE</div>
+                    <div class="mono text-xl text-green-500" id="sent-pos">-</div>
+                  </div>
+                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                    <div class="mono text-[9px] text-[var(--text-muted)]">NEUTRAL</div>
+                    <div class="mono text-xl text-gray-400" id="sent-neu">-</div>
+                  </div>
+                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                    <div class="mono text-[9px] text-[var(--text-muted)]">NEGATIVE</div>
+                    <div class="mono text-xl text-red-500" id="sent-neg">-</div>
+                  </div>
+               </div>
+               
+               <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Top Topics (Volume)</div>
+               <div id="topic-chart" class="flex flex-col gap-1"></div>
             </div>
-          </div>
 
-          <!-- TOP TOPICS -->
-          <div>
-            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">TOP TOPICS</div>
-            <div id="topics-list"></div>
           </div>
+        </div>
 
-          <!-- TOP ENTITIES -->
-          <div>
-            <div class="mono text-[10px] text-[var(--text-muted)] mb-2 border-b border-[var(--border)] pb-1">ENTITY FREQUENCY</div>
-            <div id="entities-list"></div>
-          </div>
+        <!-- DYNAMIC VIEWS (News Detail, Spatial Detail, RAG Query) will appear here -->
+        <div id="dynamic-views"></div>
 
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR (AIP ASSIST) -->
+    <aside id="sidebar-right" class="sidebar sidebar-right">
+      <div class="h-8 border-b border-[var(--border)] flex items-center justify-between px-3 mono text-[10px] bg-[var(--bg-header)]">
+        <span class="text-[var(--accent)] font-bold">AIP ASSIST</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-3 mono text-[11px]" id="chat-history">
+        <div class="text-[var(--text-muted)]">System ready. Type a query to generate an intelligence report.</div>
+      </div>
+      <div class="p-2 border-t border-[var(--border)] bg-[var(--bg-header)]">
+        <div class="cmd-box">
+          <span class="text-[var(--accent)] mr-2 font-bold">></span>
+          <input type="text" id="cmd-input" class="cmd-input" placeholder="enter query..." autocomplete="off">
+          <button onclick="executeQuery()" class="text-[var(--text-muted)] hover:text-[var(--accent)] px-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 7-7 7 7M12 19V5"/></svg>
+          </button>
         </div>
       </div>
+    </aside>
 
-      <!-- RIGHT PANEL (Trigger / News) -->
-      <div class="panel-cell">
-        <div class="panel-header">
-          <span>Trigger Events (News)</span>
-          <span class="text-[var(--accent)]">ID: T-01</span>
-        </div>
-        <div class="panel-content" id="news-list">
-          <div class="mono text-[10px] text-[var(--text-muted)]">Loading news data...</div>
-        </div>
-      </div>
-
-    </div>
-  </main>
-
-  <!-- BOTTOM BAR -->
-  <footer class="h-8 shrink-0 flex items-center px-4 border-t border-[var(--border)] bg-[var(--bg-panel)] mono text-[9px] text-[var(--text-muted)] justify-between">
-    <span>WORKSPACE: ANALYTICS</span>
-    <span>DATA SOURCE: LOCAL DB + RAG</span>
-  </footer>
+  </div>
 
 <script>
 (() => {
-  // Jam
-  setInterval(() => {
-    document.getElementById('clock').textContent = new Date().toTimeString().split(' ')[0];
-  }, 1000);
+  const $ = id => document.getElementById(id);
+  let isBusy = false;
+  let tabCount = 0;
 
-  // Fungsi buat Bar Chart
-  function renderBarList(containerId, data, labelKey, valueKey) {
-    const el = document.getElementById(containerId);
-    if (!data || data.length === 0) {
-      el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
-      return;
+  // Clock
+  setInterval(() => { $('clock').textContent = new Date().toTimeString().split(' ')[0]; }, 1000);
+
+  // Drawer logic
+  window.toggleDrawer = (side) => {
+    const el = side === 'left' ? $('sidebar-left') : $('sidebar-right');
+    const isOpen = el.classList.contains('open');
+    closeDrawers();
+    if (!isOpen) {
+      el.classList.add('open');
+      $('overlay').classList.add('show');
     }
+  };
+  window.closeDrawers = () => {
+    $('sidebar-left').classList.remove('open');
+    $('sidebar-right').classList.remove('open');
+    $('overlay').classList.remove('show');
+  };
+
+  // Tab logic
+  window.switchTab = (id) => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
     
-    // Cari nilai maksimum untuk kira peratus
+    // Activate target
+    const btn = document.querySelector(`.tab-btn[data-target="${id}"]`);
+    if(btn) btn.classList.add('active');
+    
+    const view = $(`view-${id}`);
+    if(view) view.classList.remove('hidden');
+  };
+
+  // Create dynamic tab
+  function createTab(id, title) {
+    const bar = $('tab-bar');
+    const btn = document.createElement('div');
+    btn.className = 'tab-btn';
+    btn.dataset.target = id;
+    btn.innerHTML = `${title} <span class="close-tab" onclick="event.stopPropagation(); this.parentElement.remove(); document.getElementById('view-${id}').remove(); switchTab('overview');">×</span>`;
+    btn.onclick = () => switchTab(id);
+    bar.appendChild(btn);
+    return btn;
+  }
+
+  // Chart Renderer
+  function renderChart(containerId, data, labelKey, valueKey) {
+    const el = $(containerId);
+    if (!data || data.length === 0) return el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
+    
     const maxVal = Math.max(...data.map(d => d[valueKey]));
-    
-    el.innerHTML = data.map(d => {
+    el.innerHTML = data.slice(0, 8).map(d => {
       const pct = (d[valueKey] / maxVal) * 100;
       return `
-        <div class="bar-row">
-          <div class="bar-label">${d[labelKey]}</div>
-          <div class="bar-track"><div class="bar-fill" style="width: ${pct}%"></div></div>
-          <div class="bar-val">${d[valueKey]}</div>
+        <div class="flex items-center gap-2 mono text-[10px] mb-1">
+          <div class="w-24 truncate text-[var(--text-muted)]">${d[labelKey]}</div>
+          <div class="flex-1 h-2 bg-[#090D13]"><div class="h-full bg-[var(--accent)]" style="width: ${pct}%"></div></div>
+          <div class="w-6 text-right">${d[valueKey]}</div>
         </div>
       `;
     }).join('');
   }
 
-  // Fetch Data Dashboard
+  // Fetch Dashboard Data
   async function loadDashboard() {
     try {
       const res = await fetch('/api/dashboard');
       const data = await res.json();
 
-      // 1. Populate Sentiment
+      // Overview Tab
       const sent = data.summary?.by_sentiment || {};
-      document.getElementById('sent-pos').textContent = sent.positive || 0;
-      document.getElementById('sent-neu').textContent = sent.neutral || 0;
-      document.getElementById('sent-neg').textContent = sent.negative || 0;
+      $('sent-pos').textContent = sent.positive || 0;
+      $('sent-neu').textContent = sent.neutral || 0;
+      $('sent-neg').textContent = sent.negative || 0;
 
-      // 2. Populate Topics (Bar chart)
       const topics = data.summary?.by_topic || {};
-      const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] })).slice(0, 6);
-      renderBarList('topics-list', topicsArr, 'name', 'count');
+      const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] }));
+      renderChart('topic-chart', topicsArr, 'name', 'count');
 
-      // 3. Populate Entities (Bar chart)
-      const entities = data.summary?.top_entities || [];
-      renderBarList('entities-list', entities.slice(0, 6), 'name', 'count');
-
-      // 4. Populate Spatial (Left Panel)
-      const spatialEl = document.getElementById('spatial-list');
-      if (data.spatial && data.spatial.length > 0) {
-        spatialEl.innerHTML = data.spatial.map(s => `
-          <div class="flex justify-between border-b border-[var(--border)] py-2 mono text-xs">
-             <span class="text-[var(--text-main)]">${s.district}</span>
-             <span class="text-[var(--accent)]">${(s.population/1000).toFixed(1)}k</span>
+      // Left Nav Spatial
+      const navSp = $('nav-spatial');
+      if (data.spatial && data.spatial.length) {
+        navSp.innerHTML = data.spatial.map(s => `
+          <div class="nav-item" onclick="openSpatial('${s.district}', ${s.population})">
+            <span>${s.district}</span>
+            <span class="text-[var(--accent)]">${(s.population/1000).toFixed(1)}k</span>
           </div>
         `).join('');
-      } else {
-        spatialEl.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO SPATIAL DATA</div>';
       }
 
-      // 5. Populate News (Right Panel)
-      const newsEl = document.getElementById('news-list');
-      if (data.news && data.news.length > 0) {
-        newsEl.innerHTML = data.news.map(n => `
-          <div class="border-l-2 border-[var(--border-light)] pl-2 py-1 mb-2 mono text-[10px] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text-main)] transition-colors">
-            ${n.title}
+      // Left Nav News
+      const navNews = $('nav-news');
+      if (data.news && data.news.length) {
+        navNews.innerHTML = data.news.map((n, i) => `
+          <div class="nav-item" onclick="openNews(${i}, '${n.title.replace(/'/g, "\\'")}')">
+            <span class="truncate w-4/5">${n.title}</span>
+            <span class="text-[var(--text-muted)]">></span>
           </div>
         `).join('');
-      } else {
-        newsEl.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO NEWS DATA</div>';
       }
 
     } catch (e) {
-      console.error("Dashboard Error:", e);
-      document.getElementById('spatial-list').innerHTML = `<div class="text-red-500 mono text-[10px]">ERROR: ${e.message}</div>`;
+      console.error(e);
     }
   }
+
+  // Handle Left Nav Clicks (Open Detail Views)
+  window.openSpatial = (district, pop) => {
+    closeDrawers();
+    const id = 'spatial-' + district.replace(/\s+/g, '-').toLowerCase();
+    
+    // Check if tab exists
+    if (!$(id)) {
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto';
+      view.innerHTML = `
+        <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-2xl mx-auto">
+          <div class="mono text-[10px] text-[var(--accent)] mb-2">[ SPATIAL TARGET: ${district.toUpperCase()} ]</div>
+          <div class="text-2xl font-mono mb-4">${pop.toLocaleString()} <span class="text-xs text-[var(--text-muted)]">Gen Z</span></div>
+          <div class="h-48 border border-[var(--border)] bg-[#090D13] flex items-center justify-center relative overflow-hidden">
+            <!-- Fake Map Grid -->
+            <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(var(--accent) 1px, transparent 0); background-size: 10px 10px;"></div>
+            <div class="w-4 h-4 bg-[var(--accent)] rounded-full animate-ping absolute"></div>
+            <div class="w-2 h-2 bg-white rounded-full relative z-10"></div>
+          </div>
+          <div class="mono text-[10px] text-[var(--text-muted)] mt-4">Data Source: atrric_macro.db</div>
+        </div>
+      `;
+      container.appendChild(view);
+      createTab(id, `S: ${district.substring(0,10)}`);
+    }
+    switchTab(id);
+  };
+
+  window.openNews = (idx, title) => {
+    closeDrawers();
+    const id = 'news-' + idx;
+    if (!$(id)) {
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden p-4 overflow-auto';
+      view.innerHTML = `
+        <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 max-w-3xl mx-auto">
+          <div class="mono text-[10px] text-red-400 mb-2">[ TRIGGER EVENT DETECTED ]</div>
+          <h2 class="text-lg font-medium text-white mb-4">${title}</h2>
+          <div class="mono text-[10px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2">Status: Raw Intel</div>
+        </div>
+      `;
+      container.appendChild(view);
+      createTab(id, `T: ${title.substring(0,10)}...`);
+    }
+    switchTab(id);
+  };
+
+  // Handle RAG Query
+  window.executeQuery = async () => {
+    const q = $('cmd-input').value.trim();
+    if (!q || isBusy) return;
+    
+    isBusy = true;
+    $('cmd-input').value = '';
+    
+    // Add to chat history
+    const chat = $('chat-history');
+    chat.innerHTML += `<div class="text-[var(--accent)] mt-2">> ${q}</div>`;
+    chat.innerHTML += `<div id="chat-loading" class="text-[var(--text-muted)] animate-pulse">Compiling intelligence...</div>`;
+    chat.scrollTop = chat.scrollHeight;
+    
+    closeDrawers();
+
+    try {
+      const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      
+      $('chat-loading').remove();
+      chat.innerHTML += `<div class="text-[var(--text-main)] border-l border-[var(--border)] pl-2">Report compiled.</div>`;
+      chat.scrollTop = chat.scrollHeight;
+
+      // Create new Report Tab in Main Canvas
+      const id = 'report-' + Date.now();
+      const container = $('dynamic-views');
+      const view = document.createElement('div');
+      view.id = 'view-' + id;
+      view.className = 'view-section absolute inset-0 hidden';
+      
+      const answer = data.answer || 'Tiada jawapan.';
+      const rawHTML = marked.parse(answer);
+      
+      view.innerHTML = `
+        <div class="h-full flex flex-col">
+          <div class="bg-[var(--bg-header)] border-b border-[var(--border)] p-3 flex justify-between items-center shrink-0">
+             <span class="mono text-[10px] text-[var(--accent)] uppercase">[ REPORT: ${q} ]</span>
+             <button onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.textContent='[ COPIED ]'; setTimeout(()=>this.textContent='[ COPY ]', 1500)" class="mono text-[10px] text-[var(--text-muted)] hover:text-white">[ COPY ]</button>
+             <div class="hidden">${answer}</div>
+          </div>
+          <div class="flex-1 overflow-y-auto md-content">
+            ${DOMPurify.sanitize(rawHTML)}
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(view);
+      createTab(id, `RPT: ${q.substring(0,10)}...`);
+      switchTab(id);
+
+    } catch (e) {
+      $('chat-loading').remove();
+      chat.innerHTML += `<div class="text-red-500 mt-2">ERROR: ${e.message}</div>`;
+      chat.scrollTop = chat.scrollHeight;
+    } finally {
+      isBusy = false;
+    }
+  };
+
+  $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') executeQuery(); });
 
   loadDashboard();
 
