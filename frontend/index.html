@@ -10,11 +10,8 @@
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
-
-<!-- LEAFLET CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <style>
   :root {
     --bg-app: #05070A;
@@ -27,106 +24,55 @@
     --accent: #22d3ee;
     --font-mono: 'JetBrains Mono', monospace;
   }
-
-  body {
-    background-color: var(--bg-app);
-    color: var(--text-main);
-    font-family: 'Inter', sans-serif;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
+  body { background-color: var(--bg-app); color: var(--text-main); font-family: 'Inter', sans-serif; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
   .mono { font-family: var(--font-mono); }
   .text-acc { color: var(--accent); }
-
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-light); }
 
   .app-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
-
-  .sidebar {
-    background: var(--bg-panel); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; width: 280px;
-    z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+  .sidebar { background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; width: 280px; z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
-
   @media (max-width: 768px) {
     .sidebar { position: fixed; top: 0; bottom: 0; transform: translateX(-100%); }
     .sidebar-right { right: 0; transform: translateX(100%); }
     .sidebar.open { transform: translateX(0) !important; }
   }
-
   .main-canvas { flex: 1; display: flex; flex-direction: column; min-width: 0; background: rgba(5, 7, 10, 0.8); }
-
   .tab-bar { display: flex; background: var(--bg-header); border-bottom: 1px solid var(--border); overflow-x: auto; z-index: 1000;}
-  .tab-btn {
-    padding: 8px 16px; font-family: var(--font-mono); font-size: 11px;
-    text-transform: uppercase; color: var(--text-muted); border-right: 1px solid var(--border);
-    cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
-  }
+  .tab-btn { padding: 8px 16px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--text-muted); border-right: 1px solid var(--border); cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
   .tab-btn:hover { color: var(--text-main); background: var(--bg-panel); }
   .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--bg-panel); }
-
-  .nav-item {
-    padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer;
-    font-family: var(--font-mono); font-size: 11px; display: flex; justify-content: space-between; transition: all 0.2s;
-  }
+  .nav-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-family: var(--font-mono); font-size: 11px; display: flex; justify-content: space-between; transition: all 0.2s; }
   .nav-item:hover { background: var(--bg-header); color: var(--accent); }
-
   .md-content { font-size: 13.5px; line-height: 1.6; color: #CBD5E1; padding: 20px; }
   .md-content p { margin-bottom: 12px; }
   .md-content strong { color: #F8FAFC; font-weight: 600; }
-
   #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 999; display: none; }
   #overlay.show { display: block; }
-
   .cmd-box { border: 1px solid var(--border-light); background: var(--bg-app); display: flex; align-items: center; padding: 4px 8px; }
   .cmd-box:focus-within { border-color: var(--accent); }
   .cmd-input { background: transparent; border: none; outline: none; color: var(--text-main); width: 100%; font-family: var(--font-mono); font-size: 12px; }
 
-  /* --- LEAFLET TACTICAL STYLES --- */
+  /* LEAFLET TACTICAL STYLES */
   #map { width: 100%; height: 100%; background: #05070A; z-index: 1; }
-  
-  /* Hologram Grid Overlay */
-  .map-overlay {
-    position: absolute; inset: 0; pointer-events: none; z-index: 400;
-    background-image: 
-      linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
-    box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
-  }
-  
-  /* Scanlines */
-  .scanlines {
-    position: absolute; inset: 0; pointer-events: none; z-index: 401;
-    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
-    background-size: 100% 4px;
-    opacity: 0.3;
-  }
-
-  /* HUD Text */
-  .map-hud {
-    position: absolute; z-index: 500; pointer-events: none;
-    font-family: var(--font-mono); font-size: 10px; color: var(--accent);
-    text-shadow: 0 0 5px rgba(34,211,238,0.5);
-  }
-
-  /* Leaflet Override for Dark Theme */
+  .map-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 400; background-image: linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px); background-size: 40px 40px; box-shadow: inset 0 0 50px rgba(0,0,0,0.8); }
+  .scanlines { position: absolute; inset: 0; pointer-events: none; z-index: 401; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; opacity: 0.3; }
+  .map-hud { position: absolute; z-index: 500; pointer-events: none; font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-shadow: 0 0 5px rgba(34,211,238,0.5); }
   .leaflet-container { background: #05070A !important; font-family: 'Inter', sans-serif !important; }
   .leaflet-popup-content-wrapper { background: #0F141C !important; color: #E2E8F0 !important; border: 1px solid #1F2E3D !important; border-radius: 2px !important; }
   .leaflet-popup-tip { background: #0F141C !important; }
+
+  /* TAG STYLE UNTUK ENTITIES */
+  .tag-btn { background: #1F2E3D; color: var(--accent); padding: 2px 8px; border-radius: 2px; cursor: pointer; border: 1px solid var(--border-light); display: inline-block; margin: 2px; transition: all 0.2s; font-size: 10px; font-family: var(--font-mono); }
+  .tag-btn:hover { background: var(--accent); color: #05070A; }
 </style>
 </head>
 <body>
 
   <div id="overlay" onclick="closeDrawers()"></div>
 
-  <!-- HEADER -->
   <header class="h-10 shrink-0 flex items-center justify-between px-3 bg-[var(--bg-header)] border-b border-[var(--border)] z-[1001]">
     <div class="flex items-center gap-2">
       <button class="md:hidden text-[var(--text-muted)] hover:text-[var(--accent)]" onclick="toggleDrawer('left')">
@@ -144,8 +90,6 @@
   </header>
 
   <div class="app-layout">
-
-    <!-- LEFT SIDEBAR -->
     <aside id="sidebar-left" class="sidebar">
       <div class="h-8 border-b border-[var(--border)] flex items-center px-3 mono text-[10px] text-[var(--text-muted)] bg-[var(--bg-header)]">EXPLORER</div>
       <div class="flex-1 overflow-y-auto">
@@ -156,7 +100,6 @@
       </div>
     </aside>
 
-    <!-- MAIN CANVAS -->
     <main class="main-canvas">
       <div class="tab-bar" id="tab-bar">
         <div class="tab-btn active" data-target="map" onclick="switchTab('map')">[ TACTICAL MAP ]</div>
@@ -167,18 +110,13 @@
         
         <!-- TACTICAL MAP VIEW -->
         <div id="view-map" class="view-section absolute inset-0">
-          
-          <!-- LEAFLET MAP CONTAINER -->
           <div id="map"></div>
-          
-          <!-- HOLOGRAM OVERLAYS -->
           <div class="map-overlay"></div>
           <div class="scanlines"></div>
           
-          <!-- HUD INFO -->
           <div class="map-hud top-4 left-4">
             <div class="text-[var(--accent)] mb-1 font-bold">[ GEOSPATIAL RADAR ]</div>
-            <div>ZONE: SELANGOR</div>
+            <div>ZONE: LEMBAH KLANG</div>
             <div id="hud-coords">LAT: 3.07 N, LON: 101.51 E</div>
             <div class="mt-2 text-red-500 animate-pulse">● LIVE OSM DATA LINKED</div>
           </div>
@@ -186,43 +124,56 @@
           <div class="map-hud bottom-4 right-4 text-right pr-12 pb-2">
             <div>ENGINE: LEAFLET.JS</div>
             <div>DATA: OVERPASS API (OSM)</div>
-            <div id="hud-buildings" class="text-white mt-1">SCANNING BUILDINGS...</div>
+            <div id="hud-buildings" class="text-white mt-1 text-yellow-400">SCANNING AREA...</div>
           </div>
-
         </div>
 
-        <!-- ANALYTICS VIEW -->
-        <div id="view-overview" class="view-section absolute inset-0 p-4 hidden">
-          <div class="max-w-4xl mx-auto flex flex-col gap-4">
-            <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
-               <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">Systemic Analytics</div>
-               <div class="grid grid-cols-3 gap-2 mb-6">
-                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
-                    <div class="mono text-[9px] text-[var(--text-muted)]">POSITIVE</div>
-                    <div class="mono text-xl text-green-500" id="sent-pos">-</div>
-                  </div>
-                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
-                    <div class="mono text-[9px] text-[var(--text-muted)]">NEUTRAL</div>
-                    <div class="mono text-xl text-gray-400" id="sent-neu">-</div>
-                  </div>
-                  <div class="border border-[var(--border)] p-3 bg-[#090D13]">
-                    <div class="mono text-[9px] text-[var(--text-muted)]">NEGATIVE</div>
-                    <div class="mono text-xl text-red-500" id="sent-neg">-</div>
-                  </div>
-               </div>
-               <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Top Topics (Volume)</div>
-               <div id="topic-chart" class="flex flex-col gap-1"></div>
+        <!-- ANALYTICS VIEW (UPGRADED) -->
+        <div id="view-overview" class="view-section absolute inset-0 p-4 hidden overflow-y-auto">
+          <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- KIRI: SENTIMEN & TOPIK -->
+            <div class="flex flex-col gap-4">
+              <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
+                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">Sentiment Analysis (4607 Comments)</div>
+                 <div class="grid grid-cols-3 gap-2 mb-4">
+                    <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                      <div class="mono text-[9px] text-[var(--text-muted)]">POS</div>
+                      <div class="mono text-xl text-green-500" id="sent-pos">-</div>
+                    </div>
+                    <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                      <div class="mono text-[9px] text-[var(--text-muted)]">NEU</div>
+                      <div class="mono text-xl text-gray-400" id="sent-neu">-</div>
+                    </div>
+                    <div class="border border-[var(--border)] p-3 bg-[#090D13]">
+                      <div class="mono text-[9px] text-[var(--text-muted)]">NEG</div>
+                      <div class="mono text-xl text-red-500" id="sent-neg">-</div>
+                    </div>
+                 </div>
+                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Top Topics</div>
+                 <div id="topic-chart" class="flex flex-col gap-1"></div>
+              </div>
             </div>
+
+            <!-- KANAN: ENTITIES & SLANG -->
+            <div class="flex flex-col gap-4">
+              <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
+                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2 border-b border-[var(--border)] pb-2">Top Entities (Click to Query)</div>
+                 <div id="entity-tags" class="flex flex-wrap gap-1"></div>
+              </div>
+              <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4">
+                 <div class="mono text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2 border-b border-[var(--border)] pb-2">Top Gen Z Slang</div>
+                 <div id="slang-tags" class="flex flex-wrap gap-1"></div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- DYNAMIC VIEWS -->
         <div id="dynamic-views"></div>
-
       </div>
     </main>
 
-    <!-- RIGHT SIDEBAR -->
     <aside id="sidebar-right" class="sidebar sidebar-right">
       <div class="h-8 border-b border-[var(--border)] flex items-center justify-between px-3 mono text-[10px] bg-[var(--bg-header)]">
         <span class="text-[var(--accent)] font-bold">AIP ASSIST</span>
@@ -241,7 +192,6 @@
         </div>
       </div>
     </aside>
-
   </div>
 
 <script>
@@ -250,10 +200,8 @@
   let isBusy = false;
   let map;
 
-  // Clock
   setInterval(() => { $('clock').textContent = new Date().toTimeString().split(' ')[0]; }, 1000);
 
-  // Drawer logic
   window.toggleDrawer = (side) => {
     const el = side === 'left' ? $('sidebar-left') : $('sidebar-right');
     const isOpen = el.classList.contains('open');
@@ -266,7 +214,6 @@
     $('overlay').classList.remove('show');
   };
 
-  // Tab logic
   window.switchTab = (id) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
@@ -274,7 +221,6 @@
     if(btn) btn.classList.add('active');
     const view = $(`view-${id}`);
     if(view) view.classList.remove('hidden');
-    
     if(id === 'map' && map) { setTimeout(() => map.invalidateSize(), 100); }
   };
 
@@ -289,7 +235,7 @@
     return btn;
   }
 
-  function renderChart(containerId, data, labelKey, valueKey) {
+  function renderBarChart(containerId, data, labelKey, valueKey) {
     const el = $(containerId);
     if (!data || data.length === 0) return el.innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)]">NO DATA</div>';
     const maxVal = Math.max(...data.map(d => d[valueKey]));
@@ -297,22 +243,34 @@
       const pct = (d[valueKey] / maxVal) * 100;
       return `
         <div class="flex items-center gap-2 mono text-[10px] mb-1">
-          <div class="w-24 truncate text-[var(--text-muted)]">${d[labelKey]}</div>
+          <div class="w-28 truncate text-[var(--text-muted)]">${d[labelKey]}</div>
           <div class="flex-1 h-2 bg-[#090D13]"><div class="h-full bg-[var(--accent)]" style="width: ${pct}%"></div></div>
-          <div class="w-6 text-right">${d[valueKey]}</div>
+          <div class="w-8 text-right">${d[valueKey]}</div>
         </div>
       `;
     }).join('');
   }
 
-  // --- INITIALIZE LEAFLET MAP ---
-  function initMap() {
-    map = L.map('map', {
-      zoomControl: false,
-      attributionControl: false
-    }).setView([3.0738, 101.5183], 10);
+  function renderTags(containerId, data, keyName, isSlang) {
+    const el = $(containerId);
+    if (!data || data.length === 0) return el.innerHTML = '<span class="mono text-[10px] text-[var(--text-muted)]">NONE</span>';
+    
+    el.innerHTML = data.map(d => {
+      const word = isSlang ? d.word : d.name;
+      return `<span class="tag-btn" onclick="triggerQuery('${word}')">${word.toUpperCase()} [${d.count}]</span>`;
+    }).join('');
+  }
 
-    // Guna Esri Dark Gray (Free, No API Key)
+  window.triggerQuery = (term) => {
+    $('cmd-input').value = `Analisa isu berkaitan ${term}`;
+    executeQuery();
+  };
+
+  // --- INITIALIZE MAP (FIXED BBOX) ---
+  function initMap() {
+    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([3.0738, 101.5183], 11);
+
+    // Esri Dark Gray Base (No API Key)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 16
     }).addTo(map);
@@ -322,16 +280,17 @@
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-
     fetchLiveBuildings();
   }
 
-  // --- OVERPASS API (LIVE OSM DATA) ---
+  // --- OVERPASS API (SMALLER BBOX FOR FASTER LOAD) ---
   async function fetchLiveBuildings() {
-    $('hud-buildings').textContent = "SCANNING AREA...";
-    const bbox = "2.9,101.3,3.3,101.8"; 
+    $('hud-buildings').textContent = "SCANNING LEMBAH KLANG...";
+    
+    // Kecilkan bounding box (Area KL/Shah Alam) supaya API laju sikit
+    const bbox = "3.0,101.4,3.2,101.7"; 
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:30];
       (
         way["building"="construction"](${bbox});
         way["building"="yes"](${bbox});
@@ -344,7 +303,10 @@
         method: 'POST',
         body: query
       });
+      
+      if (!res.ok) throw new Error("API Error");
       const data = await res.json();
+      
       let countCon = 0;
       let countDone = 0;
 
@@ -359,17 +321,12 @@
         if (isConstruction) countCon++;
         else countDone++;
 
-        L.polygon(latlngs, {
-          color: color,
-          weight: 1,
-          fillColor: fillColor,
-          fillOpacity: 0.5
-        }).addTo(map).bindPopup(`
+        L.polygon(latlngs, { color: color, weight: 1, fillColor: fillColor, fillOpacity: 0.6 })
+         .addTo(map)
+         .bindPopup(`
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
-            <strong style="color: ${color};">${isConstruction ? '⚠ CONSTRUCTION SITE' : '✓ COMPLETED BUILDING'}</strong><br>
-            OSM ID: ${el.id}<br>
-            ${el.tags.name ? 'Name: ' + el.tags.name + '<br>' : ''}
-            ${el.tags['addr:street'] ? 'Street: ' + el.tags['addr:street'] : ''}
+            <strong style="color: ${color};">${isConstruction ? '⚠ CONSTRUCTION' : '✓ COMPLETED'}</strong><br>
+            OSM ID: ${el.id}
           </div>
         `);
       });
@@ -378,25 +335,32 @@
 
     } catch (e) {
       console.error(e);
-      $('hud-buildings').textContent = "API LIMIT OR ERROR. TRY AGAIN LATER.";
+      $('hud-buildings').innerHTML = `<span class="text-red-500">API TIMEOUT / BUSY. ZOOM IN & REFRESH.</span>`;
     }
   }
 
-  // --- DASHBOARD DATA ---
+  // --- DASHBOARD DATA (UPGRADED) ---
   async function loadDashboard() {
     try {
       const res = await fetch('/api/dashboard');
       const data = await res.json();
 
+      // 1. Sentiment
       const sent = data.summary?.by_sentiment || {};
       $('sent-pos').textContent = sent.positive || 0;
       $('sent-neu').textContent = sent.neutral || 0;
       $('sent-neg').textContent = sent.negative || 0;
 
+      // 2. Topics Bar Chart
       const topics = data.summary?.by_topic || {};
       const topicsArr = Object.keys(topics).map(k => ({ name: k, count: topics[k] }));
-      renderChart('topic-chart', topicsArr, 'name', 'count');
+      renderBarChart('topic-chart', topicsArr, 'name', 'count');
 
+      // 3. Entities & Slang Tags
+      renderTags('entity-tags', data.summary?.top_entities, 'name', false);
+      renderTags('slang-tags', data.summary?.top_slang, 'word', true);
+
+      // 4. Sidebar
       const navSp = $('nav-spatial');
       if (data.spatial && data.spatial.length) {
         navSp.innerHTML = data.spatial.map(s => `
@@ -465,16 +429,27 @@
     const q = $('cmd-input').value.trim();
     if (!q || isBusy) return;
     isBusy = true; $('cmd-input').value = '';
+    
+    // Buka drawer kanan kalau belum buka
+    if (!document.getElementById('sidebar-right').classList.contains('open')) {
+      if(window.innerWidth < 768) toggleDrawer('right');
+    }
+
     const chat = $('chat-history');
     chat.innerHTML += `<div class="text-[var(--accent)] mt-2">> ${q}</div>`;
     chat.innerHTML += `<div id="chat-loading" class="text-[var(--text-muted)] animate-pulse">Compiling intelligence...</div>`;
     chat.scrollTop = chat.scrollHeight;
-    closeDrawers();
+    
+    // Kat mobile, tutup drawer lepas submit
+    if(window.innerWidth < 768) closeDrawers();
 
     try {
       const res = await fetch(`/api/query?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      $('chat-loading').remove();
+      
+      const loadingEl = $('chat-loading');
+      if(loadingEl) loadingEl.remove();
+      
       chat.innerHTML += `<div class="text-[var(--text-main)] border-l border-[var(--border)] pl-2">Report compiled.</div>`;
       chat.scrollTop = chat.scrollHeight;
 
@@ -500,14 +475,14 @@
       createTab(id, `RPT: ${q.substring(0,10)}...`);
       switchTab(id);
     } catch (e) {
-      $('chat-loading').remove();
+      const loadingEl = $('chat-loading');
+      if(loadingEl) loadingEl.remove();
       chat.innerHTML += `<div class="text-red-500 mt-2">ERROR: ${e.message}</div>`;
     } finally { isBusy = false; }
   };
 
   $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') executeQuery(); });
 
-  // Boot
   initMap();
   loadDashboard();
 
