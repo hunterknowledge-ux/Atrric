@@ -214,7 +214,6 @@
     $('hud-buildings').textContent = "LOADING SPATIAL DATA...";
     
     try {
-      // Tembak ke Python Server (/api/spatial)
       const res = await fetch(`/api/spatial`);
       if (!res.ok) throw new Error("Python Server Error");
       const payload = await res.json();
@@ -278,7 +277,6 @@
   // --- FETCH ANALYTICS DATA (DARI PYTHON) ---
   async function fetchAnalyticsData() {
     try {
-      // Tembak ke Python Server (/api/analytics)
       const res = await fetch(`/api/analytics`);
       if (!res.ok) throw new Error("Python Server Error");
       const data = await res.json();
