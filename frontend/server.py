@@ -72,6 +72,7 @@ class Handler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        print(f"\n[BACKEND] 📥 Menerima request POST ke: {self.path}")
         if self.path == "/api/analyze":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -82,7 +83,9 @@ class Handler(SimpleHTTPRequestHandler):
             description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
             
-            # Prompt ringkas untuk core.rag kau
+            print(f"[BACKEND] 📰 Berita: {title}")
+            print(f"[BACKEND] 🧠 Memanggil LLM (RAG)... (Mungkin ambil masa 10-30 saat)")
+            
             prompt = f"""
             TUGASAN ANALISA RISIKAN:
             Berita: "{title}"
@@ -94,11 +97,10 @@ class Handler(SimpleHTTPRequestHandler):
             """
             
             try:
-                # Panggil RAG pipeline kau
                 result = answer_question(prompt)
                 answer = result.get("answer", "Tiada jawapan dari LLM.")
+                print(f"[BACKEND] ✅ LLM berjaya dijawab.")
                 
-                # Auto-Save
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
                 safe_title = "".join([c for c in title if c.isalpha() or c.isspace()])[:30].replace(" ", "_")
                 filename = f"{REPORTS_DIR}/INTEL_{timestamp}_{safe_title}.md"
@@ -111,8 +113,10 @@ class Handler(SimpleHTTPRequestHandler):
                     f.write(f"**Original Context:** {description}\n\n---\n\n")
                     f.write(answer)
                 
+                print(f"[BACKEND] 💾 Laporan disimpan: {filename}")
                 self._send_json({"status": "success", "answer": answer, "file": filename})
             except Exception as e:
+                print(f"[BACKEND] ❌ ERROR: {e}")
                 self._send_json({"status": "error", "message": str(e)})
         else:
             self.send_response(404)
