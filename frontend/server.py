@@ -60,16 +60,24 @@ def get_archive_list():
     except Exception as e:
         return []
 
-# Fungsi untuk potong ayat yang tergantung
+# FUNGSI POTONG YANG BARU (Lebih Bijak)
 def clean_truncate(text):
     if not text: return text
     text = text.strip()
-    # Cari titik noktah terakhir
-    last_period_index = text.rfind('.')
-    if last_period_index != -1:
-        # Ambil dari mula sampai titik terakhir
-        return text[:last_period_index + 1]
-    return text
+    
+    # Kalau ayat dah tamat dengan titik/noktah, biarkan
+    if text.endswith(('.', '!', '?', '"')):
+        return text
+        
+    # Cari titik noktah terakhir dalam teks
+    matches = list(re.finditer(r'[.!?]\s', text))
+    if matches:
+        # Ambil ayat penuh terakhir, buang sisa sampah
+        last_match = matches[-1]
+        return text[:last_match.start() + 1]
+        
+    # Kalau langsung takde titik (satu perenggan panjang terpotong)
+    return text + " [TRUNCATED]"
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -81,7 +89,7 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 try: 
                     res = answer_question(q)
-                    res["answer"] = clean_truncate(res.get("answer", "")) # Potong sini juga
+                    res["answer"] = clean_truncate(res.get("answer", "")) 
                     data = res
                 except Exception as e: data = {"error": str(e), "answer": "", "sources": []}
             self._send_json(data)
@@ -119,25 +127,25 @@ class Handler(SimpleHTTPRequestHandler):
             description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
             
-            # Paksa LLM jawab pendek & padat
+            # PROMPT BARU: Larang senarai, paksa perenggan
             prompt = f"""
-            TUGASAN ANALISA RISIKAN (STRICT):
+            TUGASAN ANALISA RISIKAN:
             Berita: "{title}"
             Sumber: {source}
             Ringkasan: {description}
             
-            Arahan:
-            1. Kaitkan berita dengan isu Gen Z Malaysia.
-            2. MAKSIMUM 150 patah perkataan. Jangan lebih.
-            3. JANGAN guna bullet point yang panjang. Tulis 2 perenggan padat.
-            4. Pastikan ayat akhir tamat.
+            Arahan KETAT:
+            1. Kaitkan berita ini dengan data Gen Z Malaysia.
+            2. Tulis MAKSIMUM 2 perenggan sahaja. JANGAN guna senarai nombor (1, 2, 3) atau bullet point.
+            3. Guna ayat biasa (paragraph) supaya tak terpotong.
+            4. Jangan bebel panjang. Terus kepada isi.
             """
             
             try:
                 result = answer_question(prompt)
                 answer_raw = result.get("answer", "Tiada jawapan dari LLM.")
                 
-                # BUANG AYAT TERGANTUNG
+                # Potong ayat rosak
                 answer = clean_truncate(answer_raw)
                 
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
