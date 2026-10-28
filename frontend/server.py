@@ -51,6 +51,14 @@ def get_news_data():
         return news
     except Exception as e: return []
 
+def get_archive_list():
+    try:
+        files = [f for f in os.listdir(REPORTS_DIR) if f.endswith('.md')]
+        files.sort(reverse=True) # Yang paling baru di atas
+        return files
+    except Exception as e:
+        return []
+
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -68,11 +76,24 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(get_analytics_data())
         elif parsed.path == "/api/news":
             self._send_json({"data": get_news_data()})
+        elif parsed.path == "/api/archive":
+            self._send_json({"data": get_archive_list()})
+        elif parsed.path == "/api/archive/read":
+            filename = parse_qs(parsed.query).get("file", [""])[0]
+            if ".." in filename or "/" in filename:
+                self._send_json({"error": "Invalid filename"})
+                return
+            filepath = os.path.join(REPORTS_DIR, filename)
+            if os.path.exists(filepath):
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self._send_json({"content": content})
+            else:
+                self._send_json({"error": "File not found"})
         else:
             super().do_GET()
 
     def do_POST(self):
-        print(f"\n[BACKEND] 📥 Menerima request POST ke: {self.path}")
         if self.path == "/api/analyze":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -82,9 +103,6 @@ class Handler(SimpleHTTPRequestHandler):
             source = payload.get("source", "Unknown")
             description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
-            
-            print(f"[BACKEND] 📰 Berita: {title}")
-            print(f"[BACKEND] 🧠 Memanggil LLM (RAG)... (Mungkin ambil masa 10-30 saat)")
             
             prompt = f"""
             TUGASAN ANALISA RISIKAN:
@@ -99,13 +117,12 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 result = answer_question(prompt)
                 answer = result.get("answer", "Tiada jawapan dari LLM.")
-                print(f"[BACKEND] ✅ LLM berjaya dijawab.")
                 
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
                 safe_title = "".join([c for c in title if c.isalpha() or c.isspace()])[:30].replace(" ", "_")
-                filename = f"{REPORTS_DIR}/INTEL_{timestamp}_{safe_title}.md"
+                filename = f"INTEL_{timestamp}_{safe_title}.md"
                 
-                with open(filename, "w", encoding="utf-8") as f:
+                with open(os.path.join(REPORTS_DIR, filename), "w", encoding="utf-8") as f:
                     f.write(f"# INTEL REPORT: {title}\n")
                     f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M')}\n")
                     f.write(f"**Source:** {source}\n")
@@ -113,10 +130,8 @@ class Handler(SimpleHTTPRequestHandler):
                     f.write(f"**Original Context:** {description}\n\n---\n\n")
                     f.write(answer)
                 
-                print(f"[BACKEND] 💾 Laporan disimpan: {filename}")
                 self._send_json({"status": "success", "answer": answer, "file": filename})
             except Exception as e:
-                print(f"[BACKEND] ❌ ERROR: {e}")
                 self._send_json({"status": "error", "message": str(e)})
         else:
             self.send_response(404)
