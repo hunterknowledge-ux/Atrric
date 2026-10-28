@@ -45,7 +45,6 @@ def get_news_data():
         conn = sqlite3.connect('spatial_cache.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        # Ambil description sekali
         c.execute("SELECT id, title, link, source, country, lat, lon, date, description FROM live_news ORDER BY date DESC")
         news = [dict(row) for row in c.fetchall()]
         conn.close()
@@ -83,23 +82,23 @@ class Handler(SimpleHTTPRequestHandler):
             description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
             
-            # Prompt LLM dengan Title + Description
+            # Prompt ringkas untuk core.rag kau
             prompt = f"""
-            Anda adalah Penganalisis Risikan Atrric. 
-            Berita Global: "{title}"
+            TUGASAN ANALISA RISIKAN:
+            Berita: "{title}"
             Sumber: {source}
-            Ringkasan Berita: {description}
+            Ringkasan: {description}
             
-            Tugasan: Buat analisa '{template}' mengaitkan berita ini dengan data Gen Z Malaysia yang ada dalam RAG (summary.json).
-            Jika ringkasan tiada, guna pengetahuan am anda tentang berita ini.
-            
-            Format output dalam Markdown (Header, Analysis, Recommendation).
+            Arahan: Buat analisa '{template}' mengaitkan berita ini dengan data Gen Z Malaysia.
+            Format output: Markdown dengan bahagian Analysis dan Recommendation.
             """
             
             try:
+                # Panggil RAG pipeline kau
                 result = answer_question(prompt)
-                answer = result.get("answer", "Tiada jawapan.")
+                answer = result.get("answer", "Tiada jawapan dari LLM.")
                 
+                # Auto-Save
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
                 safe_title = "".join([c for c in title if c.isalpha() or c.isspace()])[:30].replace(" ", "_")
                 filename = f"{REPORTS_DIR}/INTEL_{timestamp}_{safe_title}.md"
