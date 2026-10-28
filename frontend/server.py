@@ -13,29 +13,6 @@ from core.rag import answer_question
 
 PORT = 8000
 
-def get_dashboard_data():
-    summary_path = os.path.join(_ROOT, "analytics_out", "summary.json")
-    summary = {}
-    if os.path.exists(summary_path):
-        with open(summary_path, "r", encoding="utf-8") as f:
-            summary = json.load(f)
-
-    spatial = [
-        {"district": "Petaling", "population": 2500000},
-        {"district": "Ulu Langat", "population": 1600000},
-        {"district": "Klang", "population": 1200000},
-        {"district": "Gombak", "population": 1000000},
-        {"district": "Sepang", "population": 400000},
-    ]
-
-    news = [
-        {"title": "Rapid KL to deploy 85 shuttle buses at Sepang"},
-        {"title": "Data Centre Bill to go to Cabinet"},
-        {"title": "Sarawak targets 15,000MW power capacity"}
-    ]
-
-    return {"summary": summary, "spatial": spatial, "news": news}
-
 def get_spatial_data():
     try:
         conn = sqlite3.connect('spatial_cache.db')
@@ -46,7 +23,6 @@ def get_spatial_data():
         conn.close()
         return projects
     except Exception as e:
-        print("Spatial DB Error:", e)
         return []
 
 def get_analytics_data():
@@ -54,18 +30,27 @@ def get_analytics_data():
         conn = sqlite3.connect('spatial_cache.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        
         c.execute("SELECT date, sector, ipi_index FROM ipi_stats ORDER BY date ASC")
         ipi = [dict(row) for row in c.fetchall()]
-        
         c.execute("SELECT state, projects, investment FROM mida_stats")
         mida = [dict(row) for row in c.fetchall()]
-        
         conn.close()
         return {"ipi": ipi, "mida": mida}
     except Exception as e:
-        print("Analytics DB Error:", e)
         return {"ipi": [], "mida": []}
+
+def get_news_data():
+    try:
+        conn = sqlite3.connect('spatial_cache.db')
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        # Ambil berita terkini
+        c.execute("SELECT id, title, link, source, country, lat, lon, date FROM live_news ORDER BY date DESC")
+        news = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return news
+    except Exception as e:
+        return []
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -82,14 +67,14 @@ class Handler(SimpleHTTPRequestHandler):
                     data = {"error": str(e), "answer": "", "sources": []}
             self._send_json(data)
             
-        elif parsed.path == "/api/dashboard":
-            self._send_json(get_dashboard_data())
-            
         elif parsed.path == "/api/spatial":
             self._send_json({"type": "geojson", "data": get_spatial_data()})
             
         elif parsed.path == "/api/analytics":
             self._send_json(get_analytics_data())
+            
+        elif parsed.path == "/api/news":
+            self._send_json({"data": get_news_data()})
             
         else:
             super().do_GET()
