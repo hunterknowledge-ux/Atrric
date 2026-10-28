@@ -10,48 +10,66 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Building struct {
-	ID       int64   `json:"id"`
-	Name     string  `json:"name"`
-	Height   float64 `json:"height"`
-	Lat      float64 `json:"lat"`
-	Lon      float64 `json:"lon"`
-}
-
 func main() {
-	fmt.Println("[ATRRIC] Spatial Go Engine running on :8081")
-	http.HandleFunc("/api/buildings", handleBuildings)
+	fmt.Println("[ATRRIC] Go Server running on :8081")
+	http.HandleFunc("/api/projects", handleProjects)
+	http.HandleFunc("/api/analytics", handleAnalytics)
 	log.Fatal(http.ListenAndServe("127.0.0.1:8081", nil))
 }
 
-func handleBuildings(w http.ResponseWriter, r *http.Request) {
+// Endpoint untuk Peta (Data Center)
+func handleProjects(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-
-	db, err := sql.Open("sqlite3", "./spatial_cache.db")
-	if err != nil {
-		http.Error(w, `{"error":"DB Error"}`, 500)
-		return
-	}
+	db, _ := sql.Open("sqlite3", "./spatial_cache.db")
 	defer db.Close()
 
-	// Ambil maksimum 200 bangunan untuk elak crash phone
-	rows, err := db.Query("SELECT id, name, height, lat, lon FROM buildings LIMIT 200")
-	if err != nil {
-		http.Error(w, `{"error":"Query Error"}`, 500)
-		return
-	}
+	rows, _ := db.Query("SELECT id, name, type, lat, lon FROM real_projects")
 	defer rows.Close()
 
-	var buildings []Building
+	var result []map[string]interface{}
 	for rows.Next() {
-		var b Building
-		rows.Scan(&b.ID, &b.Name, &b.Height, &b.Lat, &b.Lon)
-		buildings = append(buildings, b)
+		var id, name, typ string
+		var lat, lon float64
+		rows.Scan(&id, &name, &typ, &lat, &lon)
+		result = append(result, map[string]interface{}{
+			"id": id, "name": name, "type": typ, "lat": lat, "lon": lon,
+		})
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"data": result})
+}
+
+// Endpoint untuk Analytics (MIDA & IPI)
+func handleAnalytics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	db, _ := sql.Open("sqlite3", "./spatial_cache.db")
+	defer db.Close()
+
+	// 1. Ambil MIDA (Kalau ada)
+	rows, _ := db.Query("SELECT state, projects, investment FROM mida_stats")
+	var mida []map[string]interface{}
+	for rows.Next() {
+		var state string
+		var proj int
+		var inv float64
+		rows.Scan(&state, &proj, &inv)
+		mida = append(mida, map[string]interface{}{"state": state, "projects": proj, "investment": inv})
+	}
+	rows.Close()
+
+	// 2. Ambil IPI
+	rows, _ = db.Query("SELECT date, sector, ipi_index FROM ipi_stats ORDER BY date ASC")
+	var ipi []map[string]interface{}
+	for rows.Next() {
+		var date, sector string
+		var idx float64
+		rows.Scan(&date, &sector, &idx)
+		ipi = append(ipi, map[string]interface{}{"date": date, "sector": sector, "index": idx})
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"type": "geojson",
-		"data": buildings,
+		"mida": mida,
+		"ipi":  ipi,
 	})
 }
