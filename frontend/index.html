@@ -58,6 +58,10 @@
 
   .maplibregl-popup-content { background: #111 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 4px !important; font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important; padding: 12px !important; }
   .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #111 !important; }
+
+  /* ARCHIVE LIST */
+  .archive-item { background: #111; border-bottom: 1px solid var(--border); padding: 16px; cursor: pointer; transition: background 0.2s; }
+  .archive-item:active { background: #222; }
 </style>
 </head>
 <body>
@@ -115,6 +119,24 @@
     <div id="news-feed"></div>
   </div>
 
+  <!-- VIEW: ARCHIVE -->
+  <div id="view-archive" class="view-container">
+    <div class="p-4 border-b border-[var(--border)] bg-black sticky top-0 z-10 flex justify-between items-center">
+      <h2 class="mono text-xs text-[var(--text-muted)] uppercase tracking-widest">Intel Archive</h2>
+      <button onclick="fetchArchiveList()" class="mono text-[10px] text-[var(--accent)] border border-[var(--accent)] px-2 py-1">[ REFRESH ]</button>
+    </div>
+    <div id="archive-list"></div>
+    
+    <!-- VIEW: ARCHIVE DETAILS (Tersorok) -->
+    <div id="archive-details" class="hidden absolute inset-0 bg-[#050505] z-20 flex flex-col">
+      <div class="p-4 border-b border-[var(--border)] bg-black flex justify-between items-center shrink-0">
+        <h2 class="mono text-xs text-[var(--accent)] uppercase tracking-widest">Intel Report</h2>
+        <button onclick="closeArchiveDetails()" class="mono text-[10px] text-[var(--text-muted)] border border-[var(--border)] px-2 py-1">[ CLOSE ]</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4" id="archive-content"></div>
+    </div>
+  </div>
+
   <div id="view-assist" class="view-container bg-[#050505]">
     <div class="flex-1 overflow-y-auto p-4" id="chat-history">
       <div class="mono text-[10px] text-[var(--text-muted)] text-center mt-10">AIP ASSIST READY.<br>Pilih berita di tab NEWS atau MAP untuk analisa.</div>
@@ -130,6 +152,7 @@
     <div class="nav-btn active" data-target="map" onclick="switchView('map')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>MAP</span></div>
     <div class="nav-btn" data-target="stats" onclick="switchView('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>STATS</span></div>
     <div class="nav-btn" data-target="news" onclick="switchView('news')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8V6Z"/></svg><span>NEWS</span></div>
+    <div class="nav-btn" data-target="archive" onclick="switchView('archive')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M4 15h16M10 4v16"/></svg><span>ARCHIVE</span></div>
     <div class="nav-btn" data-target="assist" onclick="switchView('assist')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>AIP</span></div>
   </nav>
 
@@ -146,8 +169,49 @@
     $(`view-${id}`).classList.add('active');
     document.querySelector(`.nav-btn[data-target="${id}"]`).classList.add('active');
     if(id === 'map' && map) { setTimeout(() => map.resize(), 100); }
+    if(id === 'archive') { fetchArchiveList(); }
   };
 
+  // --- ARCHIVE LOGIC ---
+  async function fetchArchiveList() {
+    try {
+      const res = await fetch(`/api/archive`);
+      const data = await res.json();
+      const list = $('archive-list');
+      
+      if (data.data && data.data.length > 0) {
+        list.innerHTML = data.data.map(file => `
+          <div class="archive-item" onclick="openArchiveFile('${file}')">
+             <div class="mono text-[10px] text-[var(--accent)] mb-1">[ REPORT ]</div>
+             <div class="text-sm text-[var(--text-main)]">${file}</div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = '<div class="p-4 mono text-xs text-[var(--text-muted)] text-center">NO ARCHIVE DATA YET.</div>';
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  window.openArchiveFile = async (filename) => {
+    try {
+      const res = await fetch(`/api/archive/read?file=${encodeURIComponent(filename)}`);
+      const data = await res.json();
+      
+      if (data.content) {
+        const rawHTML = marked.parse(data.content);
+        $('archive-content').innerHTML = rawHTML;
+        $('archive-details').classList.remove('hidden');
+      } else {
+        alert("Gagal baca fail.");
+      }
+    } catch (e) { alert("Error: " + e.message); }
+  };
+
+  window.closeArchiveDetails = () => {
+    $('archive-details').classList.add('hidden');
+  };
+
+  // --- MAP LOGIC ---
   function initMap() {
     map = new maplibregl.Map({
       container: 'map', style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
@@ -218,26 +282,17 @@
 
   window.openModal = (newsId) => {
     selectedNews = globalNewsData.find(n => n.id === newsId);
-    if (!selectedNews) {
-        alert("Error: Data berita tidak dijumpai.");
-        return;
-    }
+    if (!selectedNews) { alert("Error: Data tidak dijumpai."); return; }
     $('modal-news-title').textContent = selectedNews.title;
     $('template-modal').classList.add('active');
   };
 
   window.closeModal = () => {
     $('template-modal').classList.remove('active');
-    // JANGAN set selectedNews = null di sini lagi
   };
 
   window.runAnalysis = async (templateType) => {
-    if (!selectedNews) {
-        alert("Error: Tiada berita dipilih.");
-        return;
-    }
-    
-    // Simpan data berita dalam pembolehubah tempatan SEBELUM tutup modal
+    if (!selectedNews) { alert("Error: Tiada berita dipilih."); return; }
     const currentNews = { ...selectedNews }; 
     
     closeModal();
@@ -261,7 +316,6 @@
       });
       
       const data = await res.json();
-
       const loadingEl = $('chat-loading');
       if(loadingEl) loadingEl.remove();
 
