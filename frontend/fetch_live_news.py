@@ -7,8 +7,11 @@ from datetime import datetime, timedelta
 conn = sqlite3.connect('spatial_cache.db')
 c = conn.cursor()
 
-# 1. Buat table (TTL: buang berita > 7 hari)
-c.execute('''CREATE TABLE IF NOT EXISTS live_news (
+# KITA DROP TABLE LAMA DULU (Sebab schema lama tak padan dengan baru)
+c.execute('DROP TABLE IF EXISTS live_news')
+
+# 1. Buat table baru
+c.execute('''CREATE TABLE live_news (
     id TEXT PRIMARY KEY, 
     title TEXT, 
     link TEXT, 
@@ -21,7 +24,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS live_news (
 
 print("⏳ Fetching Global News from RSS Feeds...")
 
-# 2. Senarai RSS Feed Global (Lokasi diletak di negara asal berita)
+# 2. Senarai RSS Feed Global
 feeds = [
     {"url": "http://feeds.bbci.co.uk/news/world/rss.xml", "name": "BBC World", "country": "UK", "lat": 51.5074, "lon": -0.1278},
     {"url": "https://www.aljazeera.com/xml/rss/all.xml", "name": "Al Jazeera", "country": "Qatar", "lat": 25.2854, "lon": 51.5310},
@@ -40,12 +43,10 @@ for f in feeds:
             xml_data = response.read()
             root = ET.fromstring(xml_data)
             
-            # Ambil 10 berita terkini per feed
             for item in root.findall('.//item')[:10]:
                 title = item.find('title').text
                 link = item.find('link').text
                 
-                # Tarikh
                 pub_date_str = item.find('pubDate').text
                 try:
                     dt = datetime.strptime(pub_date_str, '%a, %d %b %Y %H:%M:%S %z')
@@ -59,7 +60,7 @@ for f in feeds:
     except Exception as e:
         print(f"❌ Error fetching {f['name']} ({f['country']}): {e}")
     
-    time.sleep(1) # Jeda 1 saat supaya tak nampak macam bot
+    time.sleep(1)
 
 # 3. Buang berita > 7 hari
 seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y%m%d')
