@@ -98,7 +98,7 @@
           
           <div class="map-hud bottom-4 right-4 text-right pr-12 pb-2">
             <div>ENGINE: MAPLIBRE (WEBGL)</div>
-            <div>DATA: GO + SQLITE</div>
+            <div>DATA: PYTHON + SQLITE</div>
             <div id="hud-buildings" class="text-white mt-1 text-yellow-400">LOADING...</div>
           </div>
         </div>
@@ -190,8 +190,8 @@
     map = new maplibregl.Map({
       container: 'map',
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-      center: [101.6869, 3.1390], // KLCC
-      zoom: 11, 
+      center: [101.6869, 3.1390], 
+      zoom: 10, 
       pitch: 45,
       bearing: -20,
       antialias: true,
@@ -209,13 +209,14 @@
     });
   }
 
-  // --- FETCH SPATIAL DATA ---
+  // --- FETCH SPATIAL DATA (DARI PYTHON) ---
   async function fetchSpatialData() {
     $('hud-buildings').textContent = "LOADING SPATIAL DATA...";
     
     try {
-      const res = await fetch(`http://127.0.0.1:8081/api/projects`);
-      if (!res.ok) throw new Error("Go Server Error");
+      // Tembak ke Python Server (/api/spatial)
+      const res = await fetch(`/api/spatial`);
+      if (!res.ok) throw new Error("Python Server Error");
       const payload = await res.json();
       
       const features = payload.data.map(p => ({
@@ -238,10 +239,10 @@
           'paint': {
             'circle-color': [
                 'match', ['get', 'type'],
-                'Data Center', '#22d3ee',     // Cyan
-                'Factory', '#f59e0b',         // Kuning
-                'Industrial Zone', '#a855f7', // Ungu
-                'Construction', '#ef4444',    // Merah
+                'Data Center', '#22d3ee',
+                'Factory', '#f59e0b',
+                'Industrial Zone', '#a855f7',
+                'Construction', '#ef4444',
                 '#ffffff'
             ],
             'circle-radius': 6,
@@ -270,26 +271,26 @@
       $('hud-buildings').innerHTML = `MAPPED: <span class="text-[var(--accent)]">${features.length} LOCATIONS</span>`;
       
     } catch (e) {
-      $('hud-buildings').innerHTML = `<span class="text-red-500">DB OFFLINE. RUN GO SERVER.</span>`;
+      $('hud-buildings').innerHTML = `<span class="text-red-500">DB OFFLINE</span>`;
     }
   }
 
-  // --- FETCH ANALYTICS DATA ---
+  // --- FETCH ANALYTICS DATA (DARI PYTHON) ---
   async function fetchAnalyticsData() {
     try {
-      const res = await fetch(`http://127.0.0.1:8081/api/analytics`);
-      if (!res.ok) throw new Error("Go Server Error");
+      // Tembak ke Python Server (/api/analytics)
+      const res = await fetch(`/api/analytics`);
+      if (!res.ok) throw new Error("Python Server Error");
       const data = await res.json();
 
-      // Render IPI (Trend)
+      // Render IPI
       const ipiEl = document.getElementById('ipi-list');
       if (data.ipi && data.ipi.length > 0) {
-        // Ambil 8 data terkini
         const recentIPI = data.ipi.slice(-8).reverse(); 
         ipiEl.innerHTML = recentIPI.map(i => `
             <div class="border border-[var(--border)] p-2 bg-[#090D13] text-center">
                 <div class="mono text-[9px] text-[var(--text-muted)] mb-1">${i.date}</div>
-                <div class="mono text-lg text-[var(--accent)]">${i.index.toFixed(1)}</div>
+                <div class="mono text-lg text-[var(--accent)]">${i.ipi_index.toFixed(1)}</div>
                 <div class="mono text-[9px] text-green-500 truncate" title="${i.sector}">${i.sector}</div>
             </div>
         `).join('');
@@ -297,7 +298,7 @@
         ipiEl.innerHTML = '<div class="text-[var(--text-muted)] text-[10px] col-span-4">NO IPI DATA</div>';
       }
 
-      // Render MIDA (Agregat)
+      // Render MIDA
       const midaEl = document.getElementById('mida-list');
       if (data.mida && data.mida.length > 0) {
         midaEl.innerHTML = data.mida.map(m => `
@@ -307,7 +308,7 @@
             </div>
         `).join('');
       } else {
-        midaEl.innerHTML = '<div class="text-[var(--text-muted)] text-[10px]">NO MIDA DATA</div>';
+        midaEl.innerHTML = '<div class="text-[var(--text-muted)] text-[10px]">NO MIDA DATA (API DOWN)</div>';
       }
 
     } catch(e) {
