@@ -45,7 +45,8 @@ def get_news_data():
         conn = sqlite3.connect('spatial_cache.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT id, title, link, source, country, lat, lon, date FROM live_news ORDER BY date DESC")
+        # Ambil description sekali
+        c.execute("SELECT id, title, link, source, country, lat, lon, date, description FROM live_news ORDER BY date DESC")
         news = [dict(row) for row in c.fetchall()]
         conn.close()
         return news
@@ -79,21 +80,26 @@ class Handler(SimpleHTTPRequestHandler):
             
             title = payload.get("title", "Unknown News")
             source = payload.get("source", "Unknown")
+            description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
             
-            # Prompt khas untuk LLM
+            # Prompt LLM dengan Title + Description
             prompt = f"""
-            Anda adalah Penganalisis Risikan. Berita Global: "{title}" dari {source}.
-            Tugasan: Buat analisa '{template}' mengaitkan berita ini dengan data Gen Z Malaysia yang ada dalam RAG.
+            Anda adalah Penganalisis Risikan Atrric. 
+            Berita Global: "{title}"
+            Sumber: {source}
+            Ringkasan Berita: {description}
+            
+            Tugasan: Buat analisa '{template}' mengaitkan berita ini dengan data Gen Z Malaysia yang ada dalam RAG (summary.json).
+            Jika ringkasan tiada, guna pengetahuan am anda tentang berita ini.
+            
             Format output dalam Markdown (Header, Analysis, Recommendation).
             """
             
             try:
-                # Panggil LLM (Guna core.rag yang kau ada)
                 result = answer_question(prompt)
                 answer = result.get("answer", "Tiada jawapan.")
                 
-                # Auto-Save Markdown
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
                 safe_title = "".join([c for c in title if c.isalpha() or c.isspace()])[:30].replace(" ", "_")
                 filename = f"{REPORTS_DIR}/INTEL_{timestamp}_{safe_title}.md"
@@ -102,7 +108,8 @@ class Handler(SimpleHTTPRequestHandler):
                     f.write(f"# INTEL REPORT: {title}\n")
                     f.write(f"**Date:** {time.strftime('%Y-%m-%d %H:%M')}\n")
                     f.write(f"**Source:** {source}\n")
-                    f.write(f"**Template:** {template}\n\n---\n\n")
+                    f.write(f"**Template:** {template}\n\n")
+                    f.write(f"**Original Context:** {description}\n\n---\n\n")
                     f.write(answer)
                 
                 self._send_json({"status": "success", "answer": answer, "file": filename})
