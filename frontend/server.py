@@ -105,14 +105,16 @@ class Handler(SimpleHTTPRequestHandler):
             template = payload.get("template", "General Impact")
             
             prompt = f"""
-            TUGASAN ANALISA RISIKAN:
-            Berita: "{title}"
-            Sumber: {source}
-            Ringkasan: {description}
-            
-            Arahan: Buat analisa '{template}' mengaitkan berita ini dengan data Gen Z Malaysia.
-            Format output: Markdown dengan bahagian Analysis dan Recommendation.
-            """
+TUGASAN ANALISA RISIKAN (RINGKAS & PADAT):
+Berita: "{title}"
+Ringkasan: {description}
+
+Arahan:
+1. Kaitkan berita ini dengan data Gen Z Malaysia yang ada dalam bukti (RAG).
+2. Tulis MAKSIMUM 3 perenggan sahaja.
+3. Setiap perenggan WAJIB tamat dengan noktah. Jangan tinggalkan ayat tergantung.
+4. Format Markdown ringkas (bold untuk poin penting).
+"""
             
             try:
                 result = answer_question(prompt)
