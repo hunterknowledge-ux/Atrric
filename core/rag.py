@@ -5,6 +5,7 @@ Satu-satunya tempat yang tahu tentang OmniFuse.
 Bila nak swap engine lain (ship time), tukar file ni sahaja.
 
 v2: Auto-load ontology graph kalau ada.
+v3: Bypass OmniFuse synthesis, guna custom prompt untuk elak terpotong.
 """
 
 from omnifuse import EchoLLM, InMemoryGraph, OmniFuse
@@ -13,13 +14,7 @@ from core.omnifuse_adapter import PocketVectorStore
 
 
 class RAG:
-    """High-level RAG interface untuk ATRRIC.
-
-    Guna:
-        rag = RAG()
-        rag.retrieve("viral tak?")   # evidence je, tak panggil LLM
-        rag.search("viral tak?")     # full: retrieve + LLM answer
-    """
+    """High-level RAG interface untuk ATRRIC."""
 
     def __init__(self, graph=None, llm=None):
         # vector: adapter sedia ada (dah works)
@@ -35,7 +30,6 @@ class RAG:
         self._llm = llm if llm is not None else EchoLLM()
 
         # engine: satu-satunya OmniFuse instance
-        # graph_fusion=True default → auto guna graph
         self._engine = OmniFuse(
             graph=self._graph,
             vector=self._vs,
@@ -63,10 +57,7 @@ class RAG:
         return self._engine.retrieve(question, limit=limit)
 
     def search(self, question: str, synthesize: bool = True):
-        """Full pipeline. Return SearchResult.
-
-        synthesize=False → skips LLM (debug). Return evidence + prompt je.
-        """
+        """Full pipeline. Return SearchResult."""
         return self._engine.search(question, synthesize=synthesize)
 
     def close(self):
@@ -82,7 +73,6 @@ class RAG:
 
 _RAG_INSTANCE = None
 
-
 def _get_rag():
     """Lazy singleton."""
     global _RAG_INSTANCE
@@ -92,34 +82,51 @@ def _get_rag():
     return _RAG_INSTANCE
 
 
-def answer_question(q: str, top_k: int = 3) -> dict:
+def answer_question(q: str, top_k: int = 2) -> dict:
     """
-    Entry point untuk frontend/layer lain.
-
-    Returns:
-        {"answer": str, "sources": list[str]}
-
-    Raises:
-        ValueError: q kosong
-        RuntimeError: pipeline fail
+    Entry point yang diubah suai untuk elak terpotong.
+    Bypass OmniFuse synthesis, guna retrieve + IlmuLLM terus.
     """
     if not q or not q.strip():
         raise ValueError("Query kosong")
 
     rag = _get_rag()
+    
     try:
-        result = rag.search(q, synthesize=True)
+        # 1. Ambil data RAG (Hadkan 2 je supaya context tak melimpah)
+        chunks = rag.retrieve(q, limit=top_k)
+        
+        # 2. Satukan data jadi teks
+        context_text = ""
+        sources = []
+        for c in chunks:
+            text = getattr(c, "text", str(c))
+            context_text += f"- {text}\n"
+            src = getattr(c, "title", "") or ""
+            if src and src not in sources:
+                sources.append(src)
+
+        # 3. Prompt khas yang kita kawal 100%
+        final_prompt = f"""
+        DATA RAG (Gunakan ini sebagai bukti):
+        {context_text}
+        
+        TUGASAN:
+        {q}
+        
+        ARAHAN KETAT:
+        1. Tulis analisa dalam bentuk 2 perenggan biasa (bukan senarai nombor).
+        2. JANGAN guna angka 1, 2, 3 atau bullet point.
+        3. Tulis padat dan ringkas. Pastikan ayat terakhir tamat dengan noktah.
+        """
+
+        # 4. Panggil LLM terus (guna limit 2048 token)
+        answer = rag._llm.generate(final_prompt, max_tokens=2048)
+        
+        return {
+            "answer": answer,
+            "sources": sources,
+        }
+        
     except Exception as e:
         raise RuntimeError(f"RAG pipeline failed: {e}") from e
-
-    sources = []
-    chunks = getattr(result, "chunks", None) or []
-    for c in chunks[:top_k]:
-        src = getattr(c, "title", "") or ""
-        if src and src not in sources:
-            sources.append(src)
-
-    return {
-        "answer": getattr(result, "answer", "") or "",
-        "sources": sources,
-    }
