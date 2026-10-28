@@ -20,7 +20,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS mida_stats (
 )''')
 # 3. IPI (Trend)
 c.execute('''CREATE TABLE IF NOT EXISTS ipi_stats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, sector TEXT, index REAL
+    id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, sector TEXT, ipi_index REAL
 )''')
 
 # Clear old data
@@ -98,7 +98,7 @@ try:
         idx = row.get('index', 0.0)
         
         if date and idx:
-            c.execute("INSERT INTO ipi_stats (date, sector, index) VALUES (?, ?, ?)",
+            c.execute("INSERT INTO ipi_stats (date, sector, ipi_index) VALUES (?, ?, ?)",
                       (date, sector, float(idx)))
             count += 1
     print(f"✅ {count} rekod IPI dimasukkan.")
