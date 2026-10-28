@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>ATRRIC | Correlation Engine</title>
+<title>ATRRIC | Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -35,6 +35,7 @@
 
   #map { width: 100%; height: 100%; background: #05070A; z-index: 1; }
   .map-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 400; background-image: linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px); background-size: 40px 40px; }
+  .scanlines { position: absolute; inset: 0; pointer-events: none; z-index: 401; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1)); background-size: 100% 4px; opacity: 0.3; }
   .map-hud { position: absolute; z-index: 500; pointer-events: none; font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-shadow: 0 0 5px rgba(34,211,238,0.5); }
 
   .maplibregl-popup-content { background: #0F141C !important; color: #E2E8F0 !important; border: 1px solid #1F2E3D !important; border-radius: 2px !important; font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important; }
@@ -54,7 +55,7 @@
       <button class="md:hidden text-[var(--text-muted)] hover:text-[var(--accent)]" onclick="toggleDrawer('left')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <span class="mono text-xs font-bold tracking-widest">ATRRIC <span class="text-[var(--accent)]">CORRELATION</span></span>
+      <span class="mono text-xs font-bold tracking-widest">ATRRIC <span class="text-[var(--accent)]">WORKSPACE</span></span>
     </div>
     <div class="flex items-center gap-4 mono text-[10px]">
       <span id="clock" class="text-[var(--text-muted)]">00:00:00</span>
@@ -78,13 +79,16 @@
     <main class="main-canvas">
       <div class="tab-bar" id="tab-bar">
         <div class="tab-btn active" data-target="map" onclick="switchTab('map')">[ LIVE MAP ]</div>
+        <div class="tab-btn" data-target="analytics" onclick="switchTab('analytics')">[ ANALYTICS ]</div>
       </div>
 
       <div class="flex-1 overflow-hidden relative" id="canvas-content">
         
+        <!-- MAP VIEW -->
         <div id="view-map" class="view-section absolute inset-0">
           <div id="map"></div>
           <div class="map-overlay"></div>
+          <div class="scanlines"></div>
           
           <div class="map-hud top-4 left-4">
             <div class="text-[var(--accent)] mb-1 font-bold">[ SPATIAL CORRELATION ]</div>
@@ -97,6 +101,24 @@
             <div>DATA: GO + SQLITE</div>
             <div id="hud-buildings" class="text-white mt-1 text-yellow-400">LOADING...</div>
           </div>
+        </div>
+
+        <!-- ANALYTICS VIEW -->
+        <div id="view-analytics" class="view-section absolute inset-0 p-4 hidden overflow-y-auto">
+            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <!-- IPI PANEL (TREND) -->
+                <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 col-span-1 md:col-span-2">
+                    <div class="mono text-[10px] text-[var(--text-muted)] uppercase border-b border-[var(--border)] pb-2 mb-4">Industrial Production Index (OpenDOSM)</div>
+                    <div id="ipi-list" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+                </div>
+
+                <!-- MIDA PANEL (AGREGAT) -->
+                <div class="border border-[var(--border)] bg-[var(--bg-panel)] p-4 col-span-1 md:col-span-2">
+                    <div class="mono text-[10px] text-[var(--text-muted)] uppercase border-b border-[var(--border)] pb-2 mb-4">MIDA Approved Manufacturing Projects</div>
+                    <div id="mida-list" class="flex flex-col gap-1"></div>
+                </div>
+            </div>
         </div>
 
         <div id="dynamic-views"></div>
@@ -169,8 +191,8 @@
       container: 'map',
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [101.6869, 3.1390], // KLCC
-      zoom: 13,
-      pitch: 60,
+      zoom: 11, 
+      pitch: 45,
       bearing: -20,
       antialias: true,
       attributionControl: false
@@ -183,62 +205,113 @@
     });
 
     map.on('load', () => {
-      fetchCachedBuildings();
+      fetchSpatialData();
     });
   }
 
-  // --- FETCH FROM GO SERVER (SQLITE) ---
-  async function fetchCachedBuildings() {
-    $('hud-buildings').textContent = "LOADING CACHE...";
+  // --- FETCH SPATIAL DATA ---
+  async function fetchSpatialData() {
+    $('hud-buildings').textContent = "LOADING SPATIAL DATA...";
     
     try {
-      const res = await fetch(`http://127.0.0.1:8081/api/buildings`);
+      const res = await fetch(`http://127.0.0.1:8081/api/projects`);
       if (!res.ok) throw new Error("Go Server Error");
       const payload = await res.json();
       
-      const features = payload.data.map(b => ({
+      const features = payload.data.map(p => ({
         type: 'Feature',
-        properties: { id: b.id, name: b.name, height: b.height },
-        geometry: { type: 'Point', coordinates: [b.lon, b.lat] }
+        properties: { id: p.id, name: p.name, type: p.type },
+        geometry: { type: 'Point', coordinates: [p.lon, p.lat] }
       }));
 
       const geojson = { type: 'FeatureCollection', features: features };
       
-      if (map.getSource('building-data')) {
-        map.getSource('building-data').setData(geojson);
+      if (map.getSource('project-data')) {
+        map.getSource('project-data').setData(geojson);
       } else {
-        map.addSource('building-data', { type: 'geojson', data: geojson });
+        map.addSource('project-data', { type: 'geojson', data: geojson });
+        
         map.addLayer({
-          'id': 'buildings-3d',
+          'id': 'projects-points',
           'type': 'circle',
-          'source': 'building-data',
+          'source': 'project-data',
           'paint': {
-            'circle-radius': ['get', 'height'], // Radius ikut ketinggian
-            'circle-color': '#ef4444',
-            'circle-opacity': 0.7,
-            'circle-stroke-width': 2,
+            'circle-color': [
+                'match', ['get', 'type'],
+                'Data Center', '#22d3ee',     // Cyan
+                'Factory', '#f59e0b',         // Kuning
+                'Industrial Zone', '#a855f7', // Ungu
+                'Construction', '#ef4444',    // Merah
+                '#ffffff'
+            ],
+            'circle-radius': 6,
+            'circle-opacity': 0.9,
+            'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff'
           }
         });
 
-        map.on('click', 'buildings-3d', (e) => {
+        map.on('click', 'projects-points', (e) => {
           const p = e.features[0].properties;
           new maplibregl.Popup()
             .setLngLat(e.lngLat)
             .setHTML(`
               <div style="font-family: monospace; font-size: 11px;">
-                <b>Name:</b> ${p.name}<br>
-                <b>Height:</b> ${p.height}m<br>
-                <a href="https://www.openstreetmap.org/way/${p.id}" target="_blank" style="color: #22d3ee;">[ TRACE TO OSM ]</a>
+                <b style="font-size: 13px;">${p.name}</b><br>
+                <span style="color: #22d3ee;">[ ${p.type} ]</span>
               </div>
             `).addTo(map);
         });
+        
+        map.on('mouseenter', 'projects-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'projects-points', () => { map.getCanvas().style.cursor = ''; });
       }
 
-      $('hud-buildings').innerHTML = `CACHED: <span class="text-[var(--accent)]">${features.length} SITES</span>`;
+      $('hud-buildings').innerHTML = `MAPPED: <span class="text-[var(--accent)]">${features.length} LOCATIONS</span>`;
       
     } catch (e) {
       $('hud-buildings').innerHTML = `<span class="text-red-500">DB OFFLINE. RUN GO SERVER.</span>`;
+    }
+  }
+
+  // --- FETCH ANALYTICS DATA ---
+  async function fetchAnalyticsData() {
+    try {
+      const res = await fetch(`http://127.0.0.1:8081/api/analytics`);
+      if (!res.ok) throw new Error("Go Server Error");
+      const data = await res.json();
+
+      // Render IPI (Trend)
+      const ipiEl = document.getElementById('ipi-list');
+      if (data.ipi && data.ipi.length > 0) {
+        // Ambil 8 data terkini
+        const recentIPI = data.ipi.slice(-8).reverse(); 
+        ipiEl.innerHTML = recentIPI.map(i => `
+            <div class="border border-[var(--border)] p-2 bg-[#090D13] text-center">
+                <div class="mono text-[9px] text-[var(--text-muted)] mb-1">${i.date}</div>
+                <div class="mono text-lg text-[var(--accent)]">${i.index.toFixed(1)}</div>
+                <div class="mono text-[9px] text-green-500 truncate" title="${i.sector}">${i.sector}</div>
+            </div>
+        `).join('');
+      } else {
+        ipiEl.innerHTML = '<div class="text-[var(--text-muted)] text-[10px] col-span-4">NO IPI DATA</div>';
+      }
+
+      // Render MIDA (Agregat)
+      const midaEl = document.getElementById('mida-list');
+      if (data.mida && data.mida.length > 0) {
+        midaEl.innerHTML = data.mida.map(m => `
+            <div class="flex justify-between border-b border-[var(--border)] py-1 mono text-[10px]">
+                <span class="text-[var(--text-muted)]">${m.state}</span>
+                <span class="text-[var(--accent)]">RM ${(m.investment/1000000).toFixed(1)}B / ${m.projects} proj</span>
+            </div>
+        `).join('');
+      } else {
+        midaEl.innerHTML = '<div class="text-[var(--text-muted)] text-[10px]">NO MIDA DATA</div>';
+      }
+
+    } catch(e) {
+      console.error("Analytics error:", e);
     }
   }
 
@@ -268,16 +341,14 @@
     } catch (e) { console.error(e); }
   }
 
-  // Bila klik Zon (Kaitkan dengan LLM)
   window.correlateZone = (district, pop) => {
     closeDrawers();
-    map.flyTo({ center: [101.6869, 3.1390], zoom: 13, pitch: 60 });
+    map.flyTo({ center: [101.6869, 3.1390], zoom: 12, pitch: 60 });
     const query = `Analisa kaitan antara pembangunan di ${district} (Populasi Gen Z: ${pop}) dengan isu ekonomi dan sosial Gen Z.`;
     $('cmd-input').value = query;
     executeQuery();
   };
 
-  // Bila klik Isu (Kaitkan dengan LLM)
   window.correlateIssue = (issue) => {
     closeDrawers();
     const query = `Cari kaitan spatial antara isu ${issue} dengan taburan penduduk Gen Z di Selangor.`;
@@ -342,8 +413,10 @@
 
   $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') executeQuery(); });
 
+  // Boot
   initMap();
   loadDashboard();
+  fetchAnalyticsData();
 
 })();
 </script>
