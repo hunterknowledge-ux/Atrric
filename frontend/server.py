@@ -3,6 +3,7 @@ import os
 import sys
 import sqlite3
 import time
+import re
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -54,10 +55,21 @@ def get_news_data():
 def get_archive_list():
     try:
         files = [f for f in os.listdir(REPORTS_DIR) if f.endswith('.md')]
-        files.sort(reverse=True) # Yang paling baru di atas
+        files.sort(reverse=True) 
         return files
     except Exception as e:
         return []
+
+# Fungsi untuk potong ayat yang tergantung
+def clean_truncate(text):
+    if not text: return text
+    text = text.strip()
+    # Cari titik noktah terakhir
+    last_period_index = text.rfind('.')
+    if last_period_index != -1:
+        # Ambil dari mula sampai titik terakhir
+        return text[:last_period_index + 1]
+    return text
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -67,7 +79,10 @@ class Handler(SimpleHTTPRequestHandler):
             if not q:
                 data = {"error": "empty query", "answer": "", "sources": []}
             else:
-                try: data = answer_question(q)
+                try: 
+                    res = answer_question(q)
+                    res["answer"] = clean_truncate(res.get("answer", "")) # Potong sini juga
+                    data = res
                 except Exception as e: data = {"error": str(e), "answer": "", "sources": []}
             self._send_json(data)
         elif parsed.path == "/api/spatial":
@@ -104,21 +119,26 @@ class Handler(SimpleHTTPRequestHandler):
             description = payload.get("description", "No description.")
             template = payload.get("template", "General Impact")
             
+            # Paksa LLM jawab pendek & padat
             prompt = f"""
-TUGASAN ANALISA RISIKAN (RINGKAS & PADAT):
-Berita: "{title}"
-Ringkasan: {description}
-
-Arahan:
-1. Kaitkan berita ini dengan data Gen Z Malaysia yang ada dalam bukti (RAG).
-2. Tulis MAKSIMUM 3 perenggan sahaja.
-3. Setiap perenggan WAJIB tamat dengan noktah. Jangan tinggalkan ayat tergantung.
-4. Format Markdown ringkas (bold untuk poin penting).
-"""
+            TUGASAN ANALISA RISIKAN (STRICT):
+            Berita: "{title}"
+            Sumber: {source}
+            Ringkasan: {description}
+            
+            Arahan:
+            1. Kaitkan berita dengan isu Gen Z Malaysia.
+            2. MAKSIMUM 150 patah perkataan. Jangan lebih.
+            3. JANGAN guna bullet point yang panjang. Tulis 2 perenggan padat.
+            4. Pastikan ayat akhir tamat.
+            """
             
             try:
                 result = answer_question(prompt)
-                answer = result.get("answer", "Tiada jawapan dari LLM.")
+                answer_raw = result.get("answer", "Tiada jawapan dari LLM.")
+                
+                # BUANG AYAT TERGANTUNG
+                answer = clean_truncate(answer_raw)
                 
                 timestamp = time.strftime('%Y%m%d_%H%M%S')
                 safe_title = "".join([c for c in title if c.isalpha() or c.isspace()])[:30].replace(" ", "_")
