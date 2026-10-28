@@ -37,7 +37,7 @@ class IlmuLLM:
         *,
         system="",
         timeout=None,
-        max_tokens=400,
+        max_tokens=2048,
         temperature=0.3,
         prefill="",
     ):
