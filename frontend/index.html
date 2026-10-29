@@ -19,6 +19,7 @@
   .view-container { display: none; flex: 1; overflow-y: auto; padding-bottom: 70px; position: relative; }
   .view-container.active { display: flex; flex-direction: column; }
 
+  /* MAP */
   #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 1; background: #000; }
   .map-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 400; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 50px 50px; box-shadow: inset 0 0 100px rgba(0,0,0,0.9); }
   .corner { position: absolute; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.4); z-index: 450; pointer-events: none; }
@@ -29,6 +30,7 @@
   .hud-panel { position: absolute; z-index: 500; pointer-events: none; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
   .hud-title { color: var(--accent); font-weight: bold; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
+  /* STATS & NEWS */
   .metric-card { background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
   .metric-value { font-family: var(--font-mono); font-size: 24px; color: #fff; font-weight: 700; }
   .gauge { width: 80px; height: 80px; border-radius: 50%; border: 8px solid var(--border); border-top-color: #fff; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; }
@@ -36,18 +38,23 @@
   .tag { display: inline-block; font-family: var(--font-mono); font-size: 9px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 2px; text-transform: uppercase; }
   .btn-analyze { background: transparent; border: 1px solid var(--accent); color: var(--accent); font-family: var(--font-mono); font-size: 10px; padding: 4px 8px; cursor: pointer; transition: all 0.2s; }
   .btn-analyze:active { background: var(--accent); color: #000; }
+  .btn-clear { background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; padding: 4px 8px; cursor: pointer; transition: all 0.2s; }
+  .btn-clear:active { border-color: #ef4444; color: #ef4444; }
 
+  /* AIP CHAT */
   .chat-msg { padding: 12px; border-radius: 4px; font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
   .chat-user { background: #222; border-left: 2px solid #fff; font-family: var(--font-mono); font-size: 11px; }
   .chat-ai { background: #111; border: 1px solid var(--border); }
   .aip-input-box { background: #111; border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: flex-end; padding: 8px; margin: 16px; }
   .aip-input { background: transparent; border: none; outline: none; color: var(--text-main); width: 100%; font-family: var(--font-mono); font-size: 13px; resize: none; }
 
+  /* BOTTOM NAV */
   .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: rgba(10,10,10,0.95); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); backdrop-filter: blur(10px); }
   .nav-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 9px; font-family: var(--font-mono); gap: 4px; cursor: pointer; width: 100%; height: 100%; transition: color 0.2s; }
   .nav-btn.active { color: var(--accent); }
   .nav-btn svg { width: 20px; height: 20px; }
 
+  /* MODAL */
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
   .modal-overlay.active { display: flex; }
   .modal-box { background: #111; border: 1px solid #333; width: 100%; max-width: 400px; border-radius: 8px; overflow: hidden; }
@@ -59,13 +66,14 @@
   .maplibregl-popup-content { background: #111 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 4px !important; font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important; padding: 12px !important; }
   .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #111 !important; }
 
-  /* ARCHIVE LIST */
+  /* ARCHIVE */
   .archive-item { background: #111; border-bottom: 1px solid var(--border); padding: 16px; cursor: pointer; transition: background 0.2s; }
   .archive-item:active { background: #222; }
 </style>
 </head>
 <body>
 
+  <!-- MODAL -->
   <div id="template-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header"><span>[ INTEL DIRECTIVE ]</span><span onclick="closeModal()" style="cursor:pointer;">✕</span></div>
@@ -79,6 +87,7 @@
     </div>
   </div>
 
+  <!-- VIEW: MAP -->
   <div id="view-map" class="view-container active">
     <div id="map"></div><div class="map-overlay"></div>
     <div class="corner corner-tl"></div><div class="corner corner-tr"></div><div class="corner corner-bl"></div><div class="corner corner-br"></div>
@@ -100,17 +109,24 @@
     </div>
   </div>
 
+  <!-- VIEW: STATS -->
   <div id="view-stats" class="view-container p-4">
     <h2 class="mono text-xs text-[var(--text-muted)] uppercase mb-4 tracking-widest">Systemic Analytics</h2>
     <div class="grid grid-cols-2 gap-3 mb-6">
-      <div class="metric-card items-center justify-center"><div class="gauge"><span class="mono text-lg font-bold" style="transform: rotate(-45deg);" id="ipi-gauge">--</span></div><div class="mono text-[10px] text-[var(--text-muted)] mt-2">IPI INDEX</div></div>
+      <div class="metric-card items-center justify-center">
+        <div class="gauge"><span class="mono text-lg font-bold" style="transform: rotate(-45deg);" id="ipi-gauge">--</span></div>
+        <div class="mono text-[10px] text-[var(--text-muted)] mt-2">IPI INDEX</div>
+      </div>
       <div class="flex flex-col gap-3">
          <div class="metric-card"><div class="mono text-[9px] text-[var(--text-muted)]">DATA CENTERS</div><div class="metric-value" id="metric-dc">0</div></div>
          <div class="metric-card"><div class="mono text-[9px] text-[var(--text-muted)]">NEWS LOADED</div><div class="metric-value" id="metric-news">0</div></div>
       </div>
     </div>
+    <h2 class="mono text-xs text-[var(--text-muted)] uppercase mb-3 tracking-widest border-b border-[var(--border)] pb-2">Industrial Production Index</h2>
+    <div id="ipi-list" class="flex flex-col gap-2"></div>
   </div>
 
+  <!-- VIEW: NEWS -->
   <div id="view-news" class="view-container">
     <div class="p-4 border-b border-[var(--border)] bg-black sticky top-0 z-10 flex justify-between items-center">
       <h2 class="mono text-xs text-[var(--text-muted)] uppercase tracking-widest">Global Intel Feed</h2>
@@ -127,18 +143,21 @@
     </div>
     <div id="archive-list"></div>
     
-    <!-- VIEW: ARCHIVE DETAILS (Tersorok) -->
     <div id="archive-details" class="hidden absolute inset-0 bg-[#050505] z-20 flex flex-col">
       <div class="p-4 border-b border-[var(--border)] bg-black flex justify-between items-center shrink-0">
         <h2 class="mono text-xs text-[var(--accent)] uppercase tracking-widest">Intel Report</h2>
         <button onclick="closeArchiveDetails()" class="mono text-[10px] text-[var(--text-muted)] border border-[var(--border)] px-2 py-1">[ CLOSE ]</button>
       </div>
-      <!-- TAMBAH pb-24 KAT SINI -->
       <div class="flex-1 overflow-y-auto p-4 pb-24" id="archive-content"></div>
     </div>
   </div>
 
+  <!-- VIEW: AIP -->
   <div id="view-assist" class="view-container bg-[#050505]">
+    <div class="p-4 border-b border-[var(--border)] bg-black sticky top-0 z-10 flex justify-between items-center">
+      <h2 class="mono text-xs text-[var(--text-muted)] uppercase tracking-widest">AIP Assistant</h2>
+      <button onclick="clearChat()" class="btn-clear">[ CLEAR ]</button>
+    </div>
     <div class="flex-1 overflow-y-auto p-4 pb-24" id="chat-history">
       <div class="mono text-[10px] text-[var(--text-muted)] text-center mt-10">AIP ASSIST READY.<br>Pilih berita di tab NEWS atau MAP untuk analisa.</div>
     </div>
@@ -149,6 +168,7 @@
     </div>
   </div>
 
+  <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <div class="nav-btn active" data-target="map" onclick="switchView('map')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>MAP</span></div>
     <div class="nav-btn" data-target="stats" onclick="switchView('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>STATS</span></div>
@@ -169,8 +189,14 @@
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     $(`view-${id}`).classList.add('active');
     document.querySelector(`.nav-btn[data-target="${id}"]`).classList.add('active');
+    
     if(id === 'map' && map) { setTimeout(() => map.resize(), 100); }
-    if(id === 'archive') { fetchArchiveList(); }
+    if(id === 'archive') { fetchArchiveList(); } // Auto-refresh bila masuk tab archive
+  };
+
+  // --- CLEAR CHAT ---
+  window.clearChat = () => {
+    $('chat-history').innerHTML = '<div class="mono text-[10px] text-[var(--text-muted)] text-center mt-10">AIP ASSIST READY.<br>Pilih berita di tab NEWS atau MAP untuk analisa.</div>';
   };
 
   // --- ARCHIVE LOGIC ---
@@ -281,6 +307,29 @@
     } catch (e) { console.error(e); }
   }
 
+  // --- ANALYTICS LOGIC (Stats Tab) ---
+  async function fetchAnalytics() {
+    try {
+      const res = await fetch(`/api/analytics`);
+      const data = await res.json();
+
+      // IPI List
+      const ipiEl = $('ipi-list');
+      if (data.ipi && data.ipi.length > 0) {
+        const latest = data.ipi[data.ipi.length - 1];
+        $('ipi-gauge').textContent = latest.ipi_index.toFixed(0);
+
+        ipiEl.innerHTML = data.ipi.slice(-5).reverse().map(i => `
+            <div class="flex justify-between border-b border-[var(--border)] py-2 mono text-[11px]">
+                <span class="text-[var(--text-muted)]">${i.date}</span>
+                <span class="text-white">${i.ipi_index.toFixed(1)}</span>
+                <span class="text-[var(--text-muted)] truncate w-32 text-right">${i.sector}</span>
+            </div>
+        `).join('');
+      }
+    } catch(e) { console.error(e); }
+  }
+
   window.openModal = (newsId) => {
     selectedNews = globalNewsData.find(n => n.id === newsId);
     if (!selectedNews) { alert("Error: Data tidak dijumpai."); return; }
@@ -354,7 +403,9 @@
 
   $('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); executeQuery(); } });
 
+  // BOOT
   initMap();
+  fetchAnalytics();
 })();
 </script>
 </body>
